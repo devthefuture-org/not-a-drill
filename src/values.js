@@ -66,9 +66,13 @@ function parseUrl(value) {
   }
 }
 
-// ASCII only, and without `*`, `?` or backquotes, which Markdown or a
-// mailto: URI would read differently.
-const EMAIL = /^[A-Za-z0-9.!#$%&'+/=^_{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+// URLs are printed as typed, in Markdown and in security.txt: printable ASCII
+// only, without the characters a URI or Markdown would read differently.
+const URL_UNSAFE = /[^\x21-\x7e]|[\\"{}|^[\]<>*`]/;
+
+// ASCII only, without `*` or backquotes (Markdown) and without the characters
+// a mailto: URI must encode (`?`, `#`, `%`, `{`, `|`, `}`, `^`…).
+const EMAIL = /^[A-Za-z0-9.!$&'+/=_~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
 
 /** Why a contact cannot be used: 'format', 'http' or 'reserved'; null when it can. */
 export function contactProblem(value) {
@@ -77,8 +81,8 @@ export function contactProblem(value) {
     if (!url || !['https:', 'http:'].includes(url.protocol) || url.hostname === '') return 'format';
     // RFC 9116: a web URI in security.txt must begin with https://.
     if (url.protocol !== 'https:') return 'http';
-    // The sign prints the contact as typed, in Markdown and before a period.
-    if (/[*<>`]|\.$/.test(value)) return 'format';
+    // The sign prints the contact as typed, before a period.
+    if (!/^https:\/\/[^/]/i.test(value) || URL_UNSAFE.test(value) || value.endsWith('.')) return 'format';
     return isReservedHost(url.hostname) ? 'reserved' : null;
   }
   const address = value.replace(/^mailto:/i, '');
@@ -99,7 +103,7 @@ export function siteUrlProblem(value) {
   const url = parseUrl(value);
   if (!url || !['https:', 'http:'].includes(url.protocol) || url.hostname === '') return 'format';
   // The URL goes inside a Markdown link in llms.txt.
-  if (/[\s()<>*`]/.test(value)) return 'format';
-  if (url.search || url.hash) return 'query';
+  if (!/^https?:\/\/[^/]/i.test(value) || URL_UNSAFE.test(value) || /[()]/.test(value)) return 'format';
+  if (/[?#]/.test(value)) return 'query';
   return isReservedHost(url.hostname) ? 'reserved' : null;
 }

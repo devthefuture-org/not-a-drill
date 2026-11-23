@@ -141,3 +141,30 @@ test('a contact URL or site URL that Markdown would alter is refused', () => {
     assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl }).map((p) => p.path), ['siteUrl'], siteUrl);
   }
 });
+
+test('URLs are accepted only as they will be printed', () => {
+  for (const contact of [
+    'https://acme-cooperative.org/contact us',
+    'https:///acme-cooperative.org/contact',
+    'https://acme-cooperative.org\\contact',
+    'https://acme-cooperative.org/sécurité',
+    'https://acme-cooperative.org/{team}',
+    'https://acme-cooperative.org/a"b',
+    'https:\\\\acme-cooperative.org\\contact',
+  ]) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
+  }
+  for (const siteUrl of ['https://acme-cooperative.org/?', 'https://acme-cooperative.org#', 'https://acme-cooperative.org/a b', 'https:\\\\acme-cooperative.org\\docs']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl }).map((p) => p.path), ['siteUrl'], siteUrl);
+  }
+  const answers = normalizeAnswers({ ...minimalAnswers(), contact: 'https://Acme-Cooperative.org/contact/security-team', siteUrl: 'https://acme-cooperative.org/docs/' });
+  assert.equal(answers.contact, 'https://Acme-Cooperative.org/contact/security-team');
+  assert.equal(answers.siteUrl, 'https://acme-cooperative.org/docs');
+});
+
+test('an email address that a mailto: URI would cut is refused', () => {
+  for (const contact of ['jo#1@acme-cooperative.org', 'jo%41@acme-cooperative.org', 'jo|ops@acme-cooperative.org', 'jo{x}@acme-cooperative.org']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
+  }
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: "o'brien+sec@acme-cooperative.org" }).contact, "o'brien+sec@acme-cooperative.org");
+});
