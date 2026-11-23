@@ -27,6 +27,8 @@ La CLI montre les fichiers avant de les écrire, ne remplace jamais un fichier s
 | `not-a-drill-snippets/motd.txt`, `config-header.txt`, `AGENTS.snippet.md` | Sauf si vous refusez les extraits. |
 | `not-a-drill-snippets/llms.snippet.txt`, `security.snippet.txt` | Quand vous donnez l'URL d'un site. |
 
+Si `--out` contient une traduction ou des extraits d'une génération précédente que celle-ci n'écrit pas, la CLI s'arrête et les nomme : laissés en place, ils contrediraient le nouveau panneau.
+
 Les parties facultatives que vous écartez disparaissent du texte, et sa dernière section les liste sous « Changements par rapport au modèle », comme le demande CC BY. Si vous modifiez ensuite le texte à la main, ajoutez vos changements à cette ligne.
 
 ## Options
@@ -123,4 +125,4 @@ sudo install -m 644 ./panneau/NOT_A_DRILL*.md /
 
 Ajoutez `./panneau/not-a-drill-snippets/motd.txt` à la bannière de connexion (`/etc/motd`), copiez le panneau dans le répertoire personnel de chaque compte de service, et placez `config-header.txt` en tête des fichiers de configuration qui acceptent les commentaires `#`.
 
-Pour mettre le panneau à jour, changez les réponses (au moins la `date`), régénérez avec `--force`, réinstallez les fichiers, et remplacez les lignes de l'ancienne bannière et des en-têtes au lieu d'en ajouter. La date `Expires` de security.txt part du jour de la génération.
+Pour mettre le panneau à jour, changez les réponses (au moins la `date`) et générez dans un dossier vide. Installez les fichiers que la génération liste sous « Écrit », retirez de `/` tout `NOT_A_DRILL.<langue>.md` qu'elle n'écrit plus, et remplacez les lignes de l'ancienne bannière et des en-têtes au lieu d'en ajouter. La date `Expires` de security.txt part du jour de la génération.

@@ -12,7 +12,7 @@ import { planFiles } from './generate.js';
 import { MESSAGES } from './i18n.js';
 import { askAnswers } from './interactive.js';
 import { CancelledError, createPrompter, createStyle } from './prompter.js';
-import { exists, inspectWrites, WriteError, writeAll } from './write.js';
+import { exists, findLeftovers, inspectWrites, WriteError, writeAll } from './write.js';
 
 export const EXIT = { ok: 0, refused: 1, usage: 2, cancelled: 130 };
 
@@ -135,6 +135,15 @@ async function runInit(values, io) {
     prompter?.setMessages(m);
 
     const files = planFiles(answers, { today }).map((file) => ({ ...file, target: resolve(outDir, file.path), root: outDir }));
+    const leftovers = findLeftovers(outDir, files.map((file) => file.path));
+    if (leftovers.length > 0) {
+      throw new WriteError(
+        `these files in ${outDir} come from an earlier sign and would contradict this one:\n` +
+          `${leftovers.map((path) => `  ${path}\n`).join('')}` +
+          'Remove them, or write the sign to an empty directory with --out.',
+      );
+    }
+
     let saveAnswersTo = values['save-answers'] === undefined ? null : resolve(cwd, values['save-answers']);
     if (interactive) {
       prompter.say();

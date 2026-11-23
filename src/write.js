@@ -2,8 +2,9 @@
 // no file is written twice, and the directories are prepared and checked
 // before the first file, so that an error leaves no half-written sign.
 
-import { accessSync, constants, lstatSync, mkdirSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, lstatSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
+import { LANGUAGES, SNIPPETS_DIR } from './constants.js';
 
 export class WriteError extends Error {
   constructor(message, written = []) {
@@ -87,4 +88,27 @@ export function writeAll(writes, { overwrite }) {
     written.push(write.target);
   }
   return written;
+}
+
+function listOrEmpty(dir) {
+  try {
+    return readdirSync(dir);
+  } catch (error) {
+    if (error.code === 'ENOENT' || error.code === 'ENOTDIR') return [];
+    throw new WriteError(`cannot list ${dir} (${error.code ?? error.message})`);
+  }
+}
+
+/**
+ * Files an earlier run could have written in `outDir` that this run does not
+ * plan: a translation in a language the CLI writes, or a snippet. Left in
+ * place, they would contradict the new sign (an old contact, an old date).
+ * A sign in another language is the owner's own translation and stays.
+ */
+export function findLeftovers(outDir, plannedPaths) {
+  const planned = new Set(plannedPaths);
+  const ours = new RegExp(`^NOT_A_DRILL\\.(${LANGUAGES.join('|')})\\.md$`, 'i');
+  const signs = listOrEmpty(outDir).filter((name) => ours.test(name));
+  const snippets = listOrEmpty(join(outDir, SNIPPETS_DIR)).map((name) => `${SNIPPETS_DIR}/${name}`);
+  return [...signs, ...snippets].filter((path) => !planned.has(path)).sort();
 }

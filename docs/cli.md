@@ -27,6 +27,8 @@ The CLI shows the files before it writes them, never overwrites a file without a
 | `not-a-drill-snippets/motd.txt`, `config-header.txt`, `AGENTS.snippet.md` | Unless you turn the snippets off. |
 | `not-a-drill-snippets/llms.snippet.txt`, `security.snippet.txt` | When you give a website URL. |
 
+If `--out` holds a translation or snippets from an earlier run that this run does not write, the CLI stops and names them: left in place, they would contradict the new sign.
+
 The optional parts you leave out disappear from the text, and its last section lists them under "Changes from the template", as CC BY asks. If you edit the text by hand afterwards, add your changes to that line.
 
 ## Options
@@ -123,4 +125,4 @@ sudo install -m 644 ./sign/NOT_A_DRILL*.md /
 
 Add `./sign/not-a-drill-snippets/motd.txt` to the login banner (`/etc/motd`), copy the sign into the home directory of each service account, and put `config-header.txt` at the top of the configuration files that accept `#` comments.
 
-To update the sign, change the answers (at least the `date`), regenerate with `--force`, install the files again, and replace the lines of the earlier banner and headers instead of adding new ones. The security.txt `Expires` date counts from the day you generate.
+To update the sign, change the answers (at least the `date`) and generate into an empty directory. Install the files the run lists under "Written", remove from `/` any `NOT_A_DRILL.<lang>.md` it no longer writes, and replace the lines of the earlier banner and headers instead of adding new ones. The security.txt `Expires` date counts from the day you generate.

@@ -213,3 +213,30 @@ test('--no-input without answers says what is missing', () => {
   assert.equal(result.code, 2);
   assert.match(result.stderr, /--no-input needs --answers <file>/);
 });
+
+test('regenerating refuses translations and snippets left from an earlier sign', () => {
+  const cwd = withAnswers(fullAnswers());
+  assert.equal(run(['--answers', 'answers.json', '--out', 'sign'], { cwd }).code, 0);
+  const before = readFileSync(join(cwd, 'sign', 'NOT_A_DRILL.md'), 'utf8');
+
+  const { languages, siteUrl, ...rest } = fullAnswers();
+  const english = { ...rest, languages: ['en'], activity: rest.activity.en, responseTime: rest.responseTime.en };
+  english.guestRoom = { url: rest.guestRoom.url, quota: rest.guestRoom.quota.en };
+  english.cooperation = { goals: rest.cooperation.goals.en, offer: rest.cooperation.offer.en };
+  writeFileSync(join(cwd, 'v2.json'), JSON.stringify(english));
+  const result = run(['--answers', 'v2.json', '--out', 'sign', '--force'], { cwd });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /come from an earlier sign/);
+  for (const name of ['NOT_A_DRILL.fr.md', 'not-a-drill-snippets/llms.snippet.txt', 'not-a-drill-snippets/security.snippet.txt']) {
+    assert.ok(result.stderr.includes(`  ${name}\n`), name);
+  }
+  assert.equal(readFileSync(join(cwd, 'sign', 'NOT_A_DRILL.md'), 'utf8'), before, 'nothing rewritten');
+});
+
+test("an owner's own translation in another language is not a leftover", () => {
+  const cwd = withAnswers(minimalAnswers());
+  writeFileSync(join(cwd, 'NOT_A_DRILL.de.md'), 'Meine Übersetzung\n');
+  const result = run(['--answers', 'answers.json'], { cwd });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(readFileSync(join(cwd, 'NOT_A_DRILL.de.md'), 'utf8'), 'Meine Übersetzung\n');
+});
