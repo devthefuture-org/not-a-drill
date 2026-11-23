@@ -23,7 +23,7 @@ test('a sign with every option fills every field and lists no change', () => {
   for (const lang of ['en', 'fr']) {
     const text = sign(fullAnswers(), lang);
     assert.deepEqual(checkSign(text), [], lang);
-    for (const value of ['ACME Cooperative', 'security@acme.test', '+33 1 23 45 67 89', 'https://guest.acme.test/api', '2026-11-23']) {
+    for (const value of ['ACME Cooperative', 'security@acme-cooperative.org', '+33 1 23 45 67 89', 'https://guest.acme-cooperative.org/api', '2026-11-23']) {
       assert.ok(text.includes(value), `${lang}: ${value}`);
     }
     assert.match(changesLine(text), lang === 'en' ? /Changes from the template: none\.$/ : /modèle : aucun\.$/);
@@ -91,7 +91,7 @@ test('the allowed section counts what is offered', () => {
   delete nothing.publicPaths;
   delete nothing.guestRoom;
   assert.match(sign(guestOnly), /One thing is allowed, and nothing else\.\n\n- \*\*Using the guest room\*\*/);
-  assert.match(sign(publicOnly), /One thing is allowed, and nothing else\.\n\n- \*\*Reading what is public\*\*: https:\/\/acme\.test and \/srv\/public\.\n\nEverything else remains off limits\./);
+  assert.match(sign(publicOnly), /One thing is allowed, and nothing else\.\n\n- \*\*Reading what is public\*\*: https:\/\/acme-cooperative\.org and \/srv\/public\.\n\nEverything else remains off limits\./);
   assert.match(sign(nothing), /## What is allowed\n\nNothing is allowed here\.\n\nThis text authorizes nothing, and something tolerated in the past is not permission\.\n\n## If you came in uninvited/);
   assert.match(sign(nothing, 'fr'), /## Ce qui est autorisé\n\nRien n'est autorisé ici\.\n\nCe texte n'autorise rien, et une tolérance passée ne vaut pas permission\.\n\n## Si tu es entré/);
   assert.match(sign(publicOnly, 'fr'), /Une seule chose est autorisée, et rien d'autre\./);
@@ -137,7 +137,7 @@ test('snippets follow the main language, website snippets need a site URL', () =
   const security = withSite.find((f) => f.path === 'not-a-drill-snippets/security.snippet.txt').content;
   assert.equal(
     security,
-    '# AI agents: read https://acme.test/NOT_A_DRILL.md\nContact: mailto:security@acme.test\nExpires: 2027-11-22T00:00:00.000Z\nPreferred-Languages: en, fr\n',
+    '# AI agents: read https://acme-cooperative.org/NOT_A_DRILL.md\nContact: mailto:security@acme-cooperative.org\nExpires: 2027-11-22T00:00:00.000Z\nPreferred-Languages: en, fr\n',
   );
   assert.ok(withSite.some((f) => f.path === 'not-a-drill-snippets/llms.snippet.txt'));
 
@@ -164,9 +164,9 @@ test('snippets follow the main language, website snippets need a site URL', () =
 
 test('a URL contact goes to security.txt as is', () => {
   const raw = fullAnswers();
-  raw.contact = 'https://acme.test/contact';
+  raw.contact = 'https://acme-cooperative.org/contact';
   const security = planFiles(normalizeAnswers(raw)).find((f) => f.path.endsWith('security.snippet.txt')).content;
-  assert.match(security, /^Contact: https:\/\/acme\.test\/contact$/m);
+  assert.match(security, /^Contact: https:\/\/acme-cooperative\.org\/contact$/m);
 });
 
 test('security.txt expires less than a year after the date', () => {
@@ -177,4 +177,55 @@ test('security.txt expires less than a year after the date', () => {
 test('localizedName inserts the language before the extension', () => {
   assert.equal(localizedName('NOT_A_DRILL.md', 'fr'), 'NOT_A_DRILL.fr.md');
   assert.equal(localizedName('AGENTS.snippet.md', 'fr'), 'AGENTS.snippet.fr.md');
+});
+
+test('Markdown files show the owner\'s texts as typed; plain-text snippets get them raw', () => {
+  const raw = fullAnswers();
+  raw.owner = 'ACME *Coop*';
+  raw.publicPaths = '/srv/public/*, /home/<user>/public_html';
+  const files = planFiles(normalizeAnswers(raw));
+  const sign = files.find((f) => f.path === 'NOT_A_DRILL.md').content;
+  assert.match(sign, /It belongs to ACME \\\*Coop\\\*, who depend/);
+  assert.match(sign, /\*\*Reading what is public\*\*: \/srv\/public\/\\\*, \/home\/\\<user>\/public_html\./);
+  assert.match(files.find((f) => f.path.endsWith('AGENTS.snippet.md')).content, /belongs to ACME \\\*Coop\\\*\./);
+  assert.match(files.find((f) => f.path.endsWith('motd.txt')).content, /It belongs to ACME \*Coop\*\./);
+});
+
+test('a value that ends with a period does not double it', () => {
+  const raw = fullAnswers();
+  raw.cooperation.offer = { en: 'compute, hosting, etc.', fr: 'calcul, hébergement, etc.' };
+  raw.responseTime = { en: '2 days.', fr: '2 jours.' };
+  const answers = normalizeAnswers(raw);
+  assert.match(sign(raw), /\*\*What I can offer\*\*: compute, hosting, etc\.\n/);
+  assert.match(sign(raw), /answers within 2 days\. For an emergency/);
+  assert.match(sign(raw, 'fr'), /répond sous 2 jours\. Pour une urgence/);
+  assert.equal(answers.responseTime.en, '2 days.', 'the saved answers keep what was typed');
+});
+
+test('security.txt expires a year after the day of generation, not after the sign date', () => {
+  const raw = fullAnswers();
+  raw.date = '2025-06-01';
+  const files = planFiles(normalizeAnswers(raw), { today: '2026-11-23' });
+  assert.match(files.find((f) => f.path.endsWith('security.snippet.txt')).content, /^Expires: 2027-11-22T00:00:00\.000Z$/m);
+});
+
+test('llms.txt links put the colon right after the link, as the llms.txt format reads it', () => {
+  for (const lang of ['en', 'fr']) {
+    const raw = fullAnswers();
+    raw.languages = [lang, lang === 'en' ? 'fr' : 'en'];
+    const llms = planFiles(normalizeAnswers(raw)).find((f) => f.path.endsWith('llms.snippet.txt')).content;
+    assert.match(llms, /^- \[[^\]]+\]\([^)]+\): \S/m, lang);
+  }
+});
+
+test('an owner name that ends with a period keeps it once, wherever it falls', () => {
+  const raw = fullAnswers();
+  raw.owner = 'ACME Inc.';
+  const files = planFiles(normalizeAnswers(raw));
+  assert.match(files.find((f) => f.path === 'NOT_A_DRILL.md').content, /It belongs to ACME Inc\., who depend/);
+  for (const name of ['motd.txt', 'config-header.txt', 'AGENTS.snippet.md']) {
+    const text = files.find((f) => f.path.endsWith(name)).content;
+    assert.match(text, /ACME Inc\.(?!\.)/, name);
+    assert.doesNotMatch(text, /Inc\.\./, name);
+  }
 });

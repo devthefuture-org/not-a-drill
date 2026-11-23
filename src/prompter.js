@@ -29,7 +29,8 @@ const NO = ['n', 'no', 'non'];
 
 export function createPrompter({ input, output, env = process.env, messages: initialMessages }) {
   let messages = initialMessages;
-  const terminal = Boolean(input.isTTY && output.isTTY);
+  // readline's terminal mode needs raw mode: a real TTY, not a stream that only claims to be one.
+  const terminal = Boolean(input.isTTY && output.isTTY && typeof input.setRawMode === 'function');
   const rl = createInterface({ input, output, terminal });
   const style = createStyle(output, env);
   const queue = [];

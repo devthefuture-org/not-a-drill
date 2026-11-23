@@ -3,6 +3,9 @@
 // reject exactly the same things.
 
 import { LANGUAGES } from './constants.js';
+import { contactProblem, isValidDate, lineProblem, parseContact, siteUrlProblem } from './values.js';
+
+export { isValidDate, parseContact } from './values.js';
 
 export const ANSWER_KEYS = [
   'realSystem',
@@ -21,8 +24,6 @@ export const ANSWER_KEYS = [
   'snippets',
 ];
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 /** Answers that do not describe a valid sign. `problems` lists every one of them. */
 export class AnswersError extends Error {
@@ -46,30 +47,17 @@ export function todayIso(now = new Date()) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export function isValidDate(value) {
-  const m = ISO_DATE.exec(value);
-  if (!m) return false;
-  const [y, mo, d] = m.slice(1).map(Number);
-  const date = new Date(Date.UTC(y, mo - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
-}
+const CONTACT_PROBLEMS = {
+  format: 'must be an email address or an https URL that a human reads',
+  http: 'must use https: security.txt (RFC 9116) accepts only https web contacts',
+  reserved: 'uses a name reserved for examples or tests: give the real contact',
+};
 
-export function isHttpUrl(value) {
-  try {
-    const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && url.hostname !== '';
-  } catch {
-    return false;
-  }
-}
-
-/** Contact as written in the sign: an email address or an http(s) URL. `mailto:` is dropped. */
-export function parseContact(value) {
-  const bare = value.startsWith('mailto:') ? value.slice('mailto:'.length) : value;
-  if (EMAIL.test(bare)) return { kind: 'email', display: bare, uri: `mailto:${bare}` };
-  if (isHttpUrl(value)) return { kind: 'url', display: value, uri: value };
-  return null;
-}
+const SITE_URL_PROBLEMS = {
+  format: 'must be an http(s) URL',
+  query: 'must not have a query or a fragment: the sign is published at <siteUrl>/NOT_A_DRILL.md',
+  reserved: 'uses a name reserved for examples or tests: give the real website',
+};
 
 class Collector {
   problems = [];
@@ -82,7 +70,7 @@ class Collector {
 }
 
 function readLine(raw, path, problems, { required }) {
-  if (raw === undefined || raw === null || (typeof raw === 'string' && raw.trim() === '')) {
+  if (raw === undefined || raw === null || (raw === false && !required) || (typeof raw === 'string' && raw.trim() === '')) {
     if (required) problems.missing(path);
     return null;
   }
@@ -90,8 +78,13 @@ function readLine(raw, path, problems, { required }) {
     problems.invalid(path, `must be a string, got ${Array.isArray(raw) ? 'array' : typeof raw}`);
     return null;
   }
-  if (/[\r\n]/.test(raw)) {
-    problems.invalid(path, 'must fit on one line');
+  const problem = lineProblem(raw);
+  if (problem?.code === 'control') {
+    problems.invalid(path, 'must be plain text on one line: no line break, control or bidirectional character');
+    return null;
+  }
+  if (problem?.code === 'placeholder') {
+    problems.invalid(path, `looks like an unfilled field of the template (${problem.label}): write it without square brackets`);
     return null;
   }
   return raw.trim();
@@ -193,9 +186,9 @@ export function normalizeAnswers(raw, { today = todayIso() } = {}) {
 
   let contact = readLine(raw.contact, 'contact', problems, { required: true });
   if (contact !== null) {
-    const parsed = parseContact(contact);
-    if (!parsed) problems.invalid('contact', 'must be an email address or an http(s) URL that a human reads');
-    else contact = parsed.display;
+    const problem = contactProblem(contact);
+    if (problem) problems.invalid('contact', CONTACT_PROBLEMS[problem]);
+    else contact = parseContact(contact).display;
   }
 
   const responseTime = readLocalized(raw.responseTime, 'responseTime', problems, languages);
@@ -223,7 +216,8 @@ export function normalizeAnswers(raw, { today = todayIso() } = {}) {
 
   let siteUrl = readLine(raw.siteUrl, 'siteUrl', problems, { required: false });
   if (siteUrl !== null) {
-    if (!isHttpUrl(siteUrl)) problems.invalid('siteUrl', 'must be an http(s) URL');
+    const problem = siteUrlProblem(siteUrl);
+    if (problem) problems.invalid('siteUrl', SITE_URL_PROBLEMS[problem]);
     else siteUrl = siteUrl.replace(/\/+$/, '');
   }
 

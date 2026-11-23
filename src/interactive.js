@@ -1,7 +1,7 @@
 // The interactive question session. It returns raw answers in the same shape
 // as an answers file, so both go through the same validation.
 
-import { isHttpUrl, isValidDate, parseContact } from './answers.js';
+import { contactProblem, isValidDate, lineProblem, siteUrlProblem } from './values.js';
 import { LANGUAGES } from './constants.js';
 import { MESSAGES } from './i18n.js';
 
@@ -13,6 +13,16 @@ export async function askAnswers(prompter, { today }) {
   const lang = await prompter.choose('Language of your sign / Langue de ton panneau', LANGUAGES, { fallback: 'en' });
   const m = MESSAGES[lang];
   prompter.setMessages(m);
+
+  // Every answer goes into the sign: one plain line, and nothing that looks like a template field.
+  const plain = (value) => {
+    const problem = lineProblem(value);
+    if (problem?.code === 'control') return m.notPlainText;
+    if (problem?.code === 'placeholder') return m.placeholderInValue(problem.label);
+    return null;
+  };
+  const ask = (label, options = {}) =>
+    prompter.text(label, { ...options, validate: (v) => plain(v) ?? (options.validate ? options.validate(v) : null) });
   prompter.say();
   for (const line of m.intro) prompter.say(prompter.style.dim(line));
 
@@ -28,28 +38,28 @@ export async function askAnswers(prompter, { today }) {
     const result = {};
     for (const l of languages) {
       const fallback = typeof options.fallback === 'function' ? options.fallback(l) : options.fallback;
-      result[l] = await prompter.text(languages.length > 1 ? `${label}${m.inLanguage(l)}` : label, { ...options, fallback });
+      result[l] = await ask(languages.length > 1 ? `${label}${m.inLanguage(l)}` : label, { ...options, fallback });
     }
     return result;
   };
 
   const answers = { realSystem: true, languages };
-  answers.owner = await prompter.text(m.owner, { hint: m.ownerHint });
+  answers.owner = await ask(m.owner, { hint: m.ownerHint });
   answers.activity = await localized(m.activity, { hint: m.activityHint });
-  answers.contact = await prompter.text(m.contact, {
+  answers.contact = await ask(m.contact, {
     hint: m.contactHint,
-    validate: (v) => (parseContact(v) ? null : m.contactInvalid),
+    validate: (v) => (contactProblem(v) ? m.contactProblems[contactProblem(v)] : null),
   });
   answers.responseTime = await localized(m.responseTime, {
     hint: m.responseTimeHint,
     fallback: (l) => MESSAGES[l].responseTimeDefault,
   });
-  answers.emergencyContact = await prompter.text(m.emergencyContact, { hint: m.emergencyContactHint, optional: true });
-  answers.publicPaths = await prompter.text(m.publicPaths, { hint: m.publicPathsHint, optional: true });
+  answers.emergencyContact = await ask(m.emergencyContact, { hint: m.emergencyContactHint, optional: true });
+  answers.publicPaths = await ask(m.publicPaths, { hint: m.publicPathsHint, optional: true });
 
   if (await prompter.confirm(m.guestRoom, { hint: m.guestRoomHint, fallback: false })) {
     answers.guestRoom = {
-      url: await prompter.text(m.guestRoomUrl),
+      url: await ask(m.guestRoomUrl),
       quota: await localized(m.guestRoomQuota, { hint: m.guestRoomQuotaHint }),
     };
   }
@@ -63,15 +73,15 @@ export async function askAnswers(prompter, { today }) {
     };
   }
 
-  answers.date = await prompter.text(m.date, {
+  answers.date = await ask(m.date, {
     hint: m.dateHint,
     fallback: today,
     validate: (v) => (isValidDate(v) ? null : m.dateInvalid),
   });
-  answers.siteUrl = await prompter.text(m.siteUrl, {
+  answers.siteUrl = await ask(m.siteUrl, {
     hint: m.siteUrlHint,
     optional: true,
-    validate: (v) => (isHttpUrl(v) ? null : m.siteUrlInvalid),
+    validate: (v) => (siteUrlProblem(v) ? m.siteUrlProblems[siteUrlProblem(v)] : null),
   });
   answers.snippets = await prompter.confirm(m.snippets, { hint: m.snippetsHint, fallback: true });
 

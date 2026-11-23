@@ -2,7 +2,7 @@
 // checks one. Exit codes: 0 done, 1 refused or problems found, 2 usage or
 // invalid answers, 130 cancelled.
 
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { AnswersError, NotARealSystemError, normalizeAnswers, todayIso } from './answers.js';
@@ -12,6 +12,7 @@ import { planFiles } from './generate.js';
 import { MESSAGES } from './i18n.js';
 import { askAnswers } from './interactive.js';
 import { CancelledError, createPrompter, createStyle } from './prompter.js';
+import { exists, inspectWrites, WriteError, writeAll } from './write.js';
 
 export const EXIT = { ok: 0, refused: 1, usage: 2, cancelled: 130 };
 
@@ -48,11 +49,18 @@ Exit codes
 Answers file and guide: ${DOCS_URL}cli`;
 
 function readAnswersFile(path) {
-  let text;
+  let bytes;
   try {
-    text = readFileSync(path, 'utf8');
+    bytes = readFileSync(path);
   } catch (error) {
     throw new UsageError(`cannot read the answers file ${path}: ${error.message}`);
+  }
+  let text;
+  try {
+    // A byte order mark is dropped; any other non-UTF-8 byte is an error, not a replacement character in the sign.
+    text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes);
+  } catch {
+    throw new UsageError(`the answers file ${path} is not UTF-8 text`);
   }
   try {
     return JSON.parse(text);
@@ -63,16 +71,6 @@ function readAnswersFile(path) {
 
 class UsageError extends Error {
   name = 'UsageError';
-}
-
-function pathExists(path) {
-  try {
-    lstatSync(path);
-    return true;
-  } catch (error) {
-    if (error.code === 'ENOENT') return false;
-    throw error;
-  }
 }
 
 function printAnswersProblems(error, stderr) {
@@ -86,9 +84,12 @@ function printAnswersProblems(error, stderr) {
 async function runInit(values, io) {
   const { stdin, stdout, stderr, cwd } = io;
   const today = todayIso(io.now ?? new Date());
-  const interactive = !values['no-input'] && Boolean(stdin.isTTY) && values.answers === undefined;
-  const canConfirm = !values['no-input'] && Boolean(stdin.isTTY);
+  // Questions need a terminal on both ends: with stdout redirected, nobody would see them.
+  const terminal = Boolean(stdin.isTTY && stdout.isTTY);
+  const interactive = !values['no-input'] && terminal && values.answers === undefined;
+  const canConfirm = !values['no-input'] && terminal;
   const outDir = resolve(cwd, values.out ?? '.');
+  if (exists(outDir) && !statSync(outDir).isDirectory()) throw new UsageError(`--out ${outDir} is not a directory`);
 
   let prompter = null;
   let raw;
@@ -97,7 +98,11 @@ async function runInit(values, io) {
     if (values.answers !== undefined) {
       raw = readAnswersFile(resolve(cwd, values.answers));
     } else if (!interactive) {
-      throw new UsageError('no answers: run in a terminal to answer the questions, or pass --answers <file>');
+      throw new UsageError(
+        values['no-input']
+          ? 'no answers: --no-input needs --answers <file>'
+          : 'no answers: run in a terminal to answer the questions, or pass --answers <file>',
+      );
     }
     if (canConfirm) prompter = createPrompter({ input: stdin, output: stdout, env: io.env, messages: MESSAGES.en });
     if (interactive) {
@@ -127,23 +132,14 @@ async function runInit(values, io) {
     }
     if (!interactive) lang = answers.languages[0];
     const m = MESSAGES[lang];
+    prompter?.setMessages(m);
 
-    const files = planFiles(answers).map((file) => ({ ...file, target: resolve(outDir, file.path) }));
-    for (const file of files) {
-      if (!file.path.endsWith('.md') || !file.path.startsWith('NOT_A_DRILL')) continue;
-      const findings = checkSign(file.content);
-      if (findings.length > 0) {
-        stderr.write(`The generated ${file.path} does not pass the check, nothing was written:\n`);
-        for (const f of findings) stderr.write(`  ${f.line ? `line ${f.line}: ` : ''}${f.message}\n`);
-        return EXIT.usage;
-      }
-    }
-
+    const files = planFiles(answers, { today }).map((file) => ({ ...file, target: resolve(outDir, file.path), root: outDir }));
     let saveAnswersTo = values['save-answers'] === undefined ? null : resolve(cwd, values['save-answers']);
     if (interactive) {
       prompter.say();
       prompter.say(prompter.style.bold(m.filesToWrite(outDir)));
-      for (const file of files) prompter.say(`  ${file.path}${pathExists(file.target) ? prompter.style.yellow(` (${m.exists})`) : ''}`);
+      for (const file of files) prompter.say(`  ${file.path}${exists(file.target) ? prompter.style.yellow(` (${m.exists})`) : ''}`);
       if (!(await prompter.confirm(m.writeNow, { fallback: true }))) {
         prompter.say(m.notWritten);
         return EXIT.refused;
@@ -154,11 +150,13 @@ async function runInit(values, io) {
       }
     }
 
-    const writes = files.map((file) => ({ target: file.target, content: file.content }));
-    if (saveAnswersTo !== null) writes.push({ target: saveAnswersTo, content: `${JSON.stringify(answers, null, 2)}\n` });
+    const writes = files.map(({ target, root, content }) => ({ target, root, content }));
+    if (saveAnswersTo !== null) {
+      writes.push({ target: saveAnswersTo, root: dirname(saveAnswersTo), content: `${JSON.stringify(answers, null, 2)}\n` });
+    }
 
     // Every target is checked before anything is written: a refusal leaves no half-written sign.
-    const existing = writes.filter((w) => pathExists(w.target));
+    const existing = inspectWrites(writes);
     let overwrite = Boolean(values.force);
     if (existing.length > 0 && !overwrite) {
       if (prompter) {
@@ -173,10 +171,7 @@ async function runInit(values, io) {
       }
     }
 
-    for (const w of writes) {
-      mkdirSync(dirname(w.target), { recursive: true });
-      writeFileSync(w.target, w.content, { flag: overwrite ? 'w' : 'wx' });
-    }
+    writeAll(writes, { overwrite });
 
     const style = createStyle(stdout, io.env);
     stdout.write(`\n${style.green(m.written)}\n`);
@@ -189,6 +184,12 @@ async function runInit(values, io) {
       stderr.write(`\n${MESSAGES[lang].cancelled}\n`);
       return EXIT.cancelled;
     }
+    if (error instanceof WriteError) {
+      stderr.write(`not-a-drill: ${error.message}\n`);
+      if (error.written.length > 0) stderr.write(`Written before the error:\n${error.written.map((t) => `  ${t}\n`).join('')}`);
+      else stderr.write('Nothing was written.\n');
+      return EXIT.refused;
+    }
     throw error;
   } finally {
     prompter?.close();
@@ -199,7 +200,12 @@ function runCheck(paths, io) {
   const { stdout, stderr, cwd } = io;
   let files = paths.map((p) => resolve(cwd, p));
   if (files.length === 0) {
-    files = readdirSync(cwd).filter(isSignFileName).sort().map((name) => resolve(cwd, name));
+    try {
+      files = readdirSync(cwd).filter(isSignFileName).sort().map((name) => resolve(cwd, name));
+    } catch (error) {
+      stderr.write(`cannot list ${cwd} (${error.code ?? error.message})\n`);
+      return EXIT.refused;
+    }
     if (files.length === 0) {
       stderr.write(`No NOT_A_DRILL*.md in ${cwd}. Name the files to check: not-a-drill check <file>...\n`);
       return EXIT.refused;
@@ -209,12 +215,15 @@ function runCheck(paths, io) {
   let failed = false;
   for (const file of files) {
     const label = relative(cwd, file) || file;
-    if (!existsSync(file)) {
-      stderr.write(`${label}: no such file\n`);
+    let text;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch (error) {
+      stderr.write(`${label}: cannot read (${error.code ?? error.message})\n`);
       failed = true;
       continue;
     }
-    const findings = checkSign(readFileSync(file, 'utf8'));
+    const findings = checkSign(text);
     if (findings.length === 0) {
       stdout.write(`${label}: ${style.green('ok')}\n`);
       continue;

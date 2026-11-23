@@ -42,7 +42,7 @@ const tarball = join(packDir, packed.filename);
 const work = mkdtempSync(join(tmpdir(), 'not-a-drill-npx-'));
 writeFileSync(
   join(work, 'answers.json'),
-  JSON.stringify({ realSystem: true, owner: 'ACME', activity: 'running its shop', contact: 'security@acme.test', responseTime: '72 hours' }),
+  JSON.stringify({ realSystem: true, owner: 'ACME', activity: 'running its shop', contact: 'security@acme-cooperative.org', responseTime: '72 hours' }),
 );
 function npx(args) {
   return spawnSync('npx', ['--yes', '--package', tarball, 'not-a-drill', ...args], { cwd: work, encoding: 'utf8', input: '' });

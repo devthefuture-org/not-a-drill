@@ -2,43 +2,15 @@
 // context renders the published template: every option on, every field shown
 // as its bracketed label.
 
-import { parseContact } from './answers.js';
 import { PROJECT_URL, REGISTRY_URL } from './constants.js';
+import { LABELS } from './labels.js';
+import { parseContact } from './values.js';
+
+export { LABELS } from './labels.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 // RFC 9116 asks for an Expires date less than a year away.
 const SECURITY_TXT_LIFETIME_DAYS = 364;
-
-const LABELS = {
-  en: {
-    date: '[DATE]',
-    contact: '[CONTACT]',
-    owner: '[NAME OR ORGANIZATION]',
-    activity: '[ACTIVITY]',
-    publicPaths: '[PUBLIC PATHS OR URLS]',
-    guestRoomUrl: '[URL OR API]',
-    guestRoomQuota: '[QUOTA]',
-    responseTime: '[RESPONSE TIME]',
-    emergencyContact: '[EMERGENCY CONTACT]',
-    goals: '[GOALS OR NEEDS]',
-    offer: '[COMPUTE, DATA, HOSTING, OTHER]',
-    changes: '[NONE, OR LIST THEM]',
-  },
-  fr: {
-    date: '[DATE]',
-    contact: '[CONTACT]',
-    owner: '[NOM OU ORGANISATION]',
-    activity: '[ACTIVITÉ]',
-    publicPaths: '[CHEMINS OU URL PUBLICS]',
-    guestRoomUrl: '[URL OU API]',
-    guestRoomQuota: '[QUOTA]',
-    responseTime: '[DÉLAI]',
-    emergencyContact: "[CONTACT D'URGENCE]",
-    goals: '[OBJECTIFS OU BESOINS]',
-    offer: '[CALCUL, DONNÉES, HÉBERGEMENT, AUTRE]',
-    changes: '[AUCUN, OU LES LISTER]',
-  },
-};
 
 const REFERENCE_SNIPPET_VALUES = {
   siteUrl: 'https://example.com',
@@ -80,31 +52,49 @@ export function securityExpires(date) {
   return new Date(Date.UTC(y, m - 1, d) + SECURITY_TXT_LIFETIME_DAYS * DAY_MS).toISOString();
 }
 
-export function buildContext(answers, lang) {
+// In a Markdown file, `*`, `<`, backquotes and backslashes in a value would
+// turn into formatting and change what the reader sees (`/srv/public/*`).
+export function escapeMarkdown(value) {
+  return value.replace(/[\\*<`]/g, '\\$&');
+}
+
+// The template ends these sentences with its own period.
+function withoutFinalPeriod(value) {
+  return value.replace(/\.$/, '');
+}
+
+/**
+ * Values for the templates. `markdown` escapes the owner's texts for a .md
+ * file; `today` dates the security.txt expiry from the day of generation.
+ */
+export function buildContext(answers, lang, { markdown = false, today = answers.date } = {}) {
+  const text = markdown ? escapeMarkdown : (value) => value;
+  const sentence = (value) => text(withoutFinalPeriod(value));
   const pick = (localized) => localized[lang];
   const allowedCount = Number(Boolean(answers.publicPaths)) + Number(Boolean(answers.guestRoom));
   return {
     date: answers.date,
     contact: answers.contact,
-    owner: answers.owner,
-    activity: pick(answers.activity),
-    responseTime: pick(answers.responseTime),
-    emergencyContact: answers.emergencyContact ?? '',
-    publicPaths: answers.publicPaths ?? '',
+    owner: text(answers.owner),
+    ownerAtEnd: sentence(answers.owner),
+    activity: sentence(pick(answers.activity)),
+    responseTime: sentence(pick(answers.responseTime)),
+    emergencyContact: answers.emergencyContact ? sentence(answers.emergencyContact) : '',
+    publicPaths: answers.publicPaths ? sentence(answers.publicPaths) : '',
     guestRoom: Boolean(answers.guestRoom),
-    guestRoomUrl: answers.guestRoom?.url ?? '',
-    guestRoomQuota: answers.guestRoom ? pick(answers.guestRoom.quota) : '',
+    guestRoomUrl: answers.guestRoom ? text(answers.guestRoom.url) : '',
+    guestRoomQuota: answers.guestRoom ? sentence(pick(answers.guestRoom.quota)) : '',
     ...allowedFlags(allowedCount),
     atLeastList: answers.atLeastList,
     cooperation: Boolean(answers.cooperation),
-    goals: answers.cooperation ? pick(answers.cooperation.goals) : '',
-    offer: answers.cooperation ? pick(answers.cooperation.offer) : '',
+    goals: answers.cooperation ? sentence(pick(answers.cooperation.goals)) : '',
+    offer: answers.cooperation ? sentence(pick(answers.cooperation.offer)) : '',
     changes: describeChanges(answers, lang),
     projectUrl: PROJECT_URL,
     registryUrl: REGISTRY_URL,
     siteUrl: answers.siteUrl ?? '',
     securityContact: parseContact(answers.contact).uri,
-    expires: securityExpires(answers.date),
+    expires: securityExpires(today),
     preferredLanguages: answers.languages.join(', '),
   };
 }
@@ -112,6 +102,7 @@ export function buildContext(answers, lang) {
 export function referenceContext(lang) {
   return {
     ...LABELS[lang],
+    ownerAtEnd: LABELS[lang].owner,
     guestRoom: true,
     ...allowedFlags(2),
     atLeastList: true,

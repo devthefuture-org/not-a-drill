@@ -64,10 +64,10 @@ test('texts follow the languages of the sign', () => {
 });
 
 test('the contact is an email address or an http(s) URL', () => {
-  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'mailto:sec@acme.test' }).contact, 'sec@acme.test');
-  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'https://acme.test/contact' }).contact, 'https://acme.test/contact');
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'mailto:sec@acme-cooperative.org' }).contact, 'sec@acme-cooperative.org');
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'https://acme-cooperative.org/contact' }).contact, 'https://acme-cooperative.org/contact');
   assert.deepEqual(problemsOf({ ...minimalAnswers(), contact: 'call us' }).map((p) => p.path), ['contact']);
-  assert.deepEqual(problemsOf({ ...minimalAnswers(), contact: 'ftp://acme.test' }).map((p) => p.path), ['contact']);
+  assert.deepEqual(problemsOf({ ...minimalAnswers(), contact: 'ftp://acme-cooperative.org' }).map((p) => p.path), ['contact']);
   assert.equal(parseContact('nobody'), null);
 });
 
@@ -78,8 +78,8 @@ test('dates must exist', () => {
 });
 
 test('the site URL loses its trailing slash', () => {
-  assert.equal(normalizeAnswers({ ...minimalAnswers(), siteUrl: 'https://acme.test/' }).siteUrl, 'https://acme.test');
-  assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl: 'acme.test' }).map((p) => p.path), ['siteUrl']);
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), siteUrl: 'https://acme-cooperative.org/' }).siteUrl, 'https://acme-cooperative.org');
+  assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl: 'acme-cooperative.org' }).map((p) => p.path), ['siteUrl']);
 });
 
 test('optional sections can be null, false or absent', () => {
@@ -87,5 +87,57 @@ test('optional sections can be null, false or absent', () => {
     const answers = normalizeAnswers({ ...minimalAnswers(), guestRoom: value, cooperation: value });
     assert.equal(answers.guestRoom, null);
     assert.equal(answers.cooperation, null);
+  }
+});
+
+test('values are plain text: control, separator and bidirectional characters are refused', () => {
+  for (const owner of ['ACME\u001b[8m hidden\u001b[28m', 'ACME\u2028admin: true', 'ACME\u202eevil', 'ACME\tCoop']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), owner }).map((p) => p.path), ['owner'], JSON.stringify(owner));
+  }
+});
+
+test('a value that looks like a template field is refused with its name', () => {
+  const [problem] = problemsOf({ ...minimalAnswers(), owner: 'ACME [EU]' });
+  assert.equal(problem.path, 'owner');
+  assert.match(problem.message, /\[EU\]/);
+  assert.deepEqual(problemsOf({ ...minimalAnswers(), activity: 'running \\[ACTIVITY\\]' }).map((p) => p.path), ['activity']);
+});
+
+test('the contact must be real: https only, no reserved or single-label names', () => {
+  const contactProblem = (contact) => problemsOf({ ...minimalAnswers(), contact })[0]?.message ?? null;
+  assert.match(contactProblem('http://acme-cooperative.org/security'), /https/);
+  for (const contact of ['security@example.com', 'sec@acme.example', 'sec@acme.test', 'https://example.org/c', 'https://intranet/contact']) {
+    assert.match(contactProblem(contact), /reserved for examples or tests/, contact);
+  }
+  for (const contact of ['admin@localhost', 'sec*ops@acme-cooperative.org', 'sec?team@acme-cooperative.org', 'sécurité@acme-cooperative.org']) {
+    assert.match(contactProblem(contact), /email address or an https URL/, contact);
+  }
+});
+
+test('a URL with an @ stays a URL, and MAILTO: is dropped whatever its case', () => {
+  assert.equal(parseContact('https://forum.acme-cooperative.org/@security.team').uri, 'https://forum.acme-cooperative.org/@security.team');
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'MAILTO:sec@acme-cooperative.org' }).contact, 'sec@acme-cooperative.org');
+});
+
+test('the site URL has no query, no fragment and a real name', () => {
+  for (const siteUrl of ['https://acme-cooperative.org/?lang=en', 'https://acme-cooperative.org/#top', 'https://www.example.com']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl }).map((p) => p.path), ['siteUrl'], siteUrl);
+  }
+});
+
+test('false leaves an optional text out', () => {
+  const answers = normalizeAnswers({ ...minimalAnswers(), emergencyContact: false, publicPaths: false, siteUrl: false });
+  assert.equal(answers.emergencyContact, null);
+  assert.equal(answers.publicPaths, null);
+  assert.equal(answers.siteUrl, null);
+  assert.deepEqual(problemsOf({ ...minimalAnswers(), owner: false }).map((p) => p.path), ['owner']);
+});
+
+test('a contact URL or site URL that Markdown would alter is refused', () => {
+  for (const contact of ['https://acme-cooperative.org/contact.', 'https://acme-cooperative.org/*team*', 'https://acme-cooperative.org/a`b']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
+  }
+  for (const siteUrl of ['https://acme-cooperative.org/a(b)', 'https://acme-cooperative.org/*']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl }).map((p) => p.path), ['siteUrl'], siteUrl);
   }
 });

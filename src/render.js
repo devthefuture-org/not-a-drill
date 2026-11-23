@@ -4,7 +4,7 @@
 // Every mistake is an error: an unknown tag, an unclosed or stray block, a
 // missing or non-string value.
 
-const STANDALONE_BLOCK_TAG = /^[ \t]*(\{\{(?:#if [A-Za-z]\w*|\/if)\}\})[ \t]*\n/gm;
+const STANDALONE_BLOCK_TAG = /^[ \t]*(\{\{(?:#if [A-Za-z]\w*|\/if)\}\})[ \t]*\r?\n/gm;
 const TAG = /\{\{(.*?)\}\}/g;
 const IDENTIFIER = /^[A-Za-z]\w*$/;
 

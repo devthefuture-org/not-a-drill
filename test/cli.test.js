@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -124,10 +124,92 @@ test('check without a sign to check exits 1', () => {
   assert.equal(run(['check', 'missing.md'], { cwd }).code, 1);
 });
 
-test('a value that looks like an unfilled field blocks the write', () => {
+test('a value that looks like an unfilled field is refused before any write', () => {
   const cwd = withAnswers({ ...minimalAnswers(), owner: '[NAME OR ORGANIZATION]' });
   const result = run(['--answers', 'answers.json'], { cwd });
   assert.equal(result.code, 2);
-  assert.match(result.stderr, /does not pass the check, nothing was written/);
+  assert.match(result.stderr, /owner: looks like an unfilled field of the template \(\[NAME OR ORGANIZATION\]\)/);
   assert.deepEqual(readdirSync(cwd), ['answers.json']);
+});
+
+test('--save-answers cannot name one of the sign files', () => {
+  for (const force of [[], ['--force']]) {
+    const cwd = withAnswers(minimalAnswers());
+    const result = run(['--answers', 'answers.json', '--save-answers', 'NOT_A_DRILL.md', ...force], { cwd });
+    assert.equal(result.code, 1, result.stderr);
+    assert.match(result.stderr, /would be written twice/);
+    assert.deepEqual(readdirSync(cwd), ['answers.json'], 'nothing written');
+  }
+});
+
+test('nothing is written through a symbolic link, even with --force', () => {
+  const cwd = withAnswers(minimalAnswers());
+  mkdirSync(join(cwd, 'out'));
+  mkdirSync(join(cwd, 'elsewhere'));
+  writeFileSync(join(cwd, 'elsewhere', 'victim.txt'), 'victim\n');
+  symlinkSync('../elsewhere/victim.txt', join(cwd, 'out', 'NOT_A_DRILL.md'));
+  const linked = run(['--answers', 'answers.json', '--out', 'out', '--force'], { cwd });
+  assert.equal(linked.code, 1);
+  assert.match(linked.stderr, /is a symbolic link/);
+  assert.equal(readFileSync(join(cwd, 'elsewhere', 'victim.txt'), 'utf8'), 'victim\n');
+
+  const cwd2 = withAnswers(minimalAnswers());
+  mkdirSync(join(cwd2, 'out'));
+  mkdirSync(join(cwd2, 'elsewhere'));
+  symlinkSync('../elsewhere', join(cwd2, 'out', 'not-a-drill-snippets'));
+  const dir = run(['--answers', 'answers.json', '--out', 'out'], { cwd: cwd2 });
+  assert.equal(dir.code, 1);
+  assert.match(dir.stderr, /not-a-drill-snippets is a symbolic link/);
+  assert.deepEqual(readdirSync(join(cwd2, 'elsewhere')), []);
+  assert.deepEqual(readdirSync(join(cwd2, 'out')), ['not-a-drill-snippets'], 'no sign written either');
+});
+
+test('a directory that cannot be written stops the run before the first file, without a stack trace', { skip: process.getuid?.() === 0 && 'root ignores permissions' }, () => {
+  const cwd = withAnswers(minimalAnswers());
+  mkdirSync(join(cwd, 'out', 'not-a-drill-snippets'), { recursive: true });
+  chmodSync(join(cwd, 'out', 'not-a-drill-snippets'), 0o555);
+  const result = run(['--answers', 'answers.json', '--out', 'out'], { cwd });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /cannot write in .*not-a-drill-snippets \(EACCES\)\nNothing was written\./);
+  assert.doesNotMatch(result.stderr, /\n\s+at /);
+  assert.ok(!existsSync(join(cwd, 'out', 'NOT_A_DRILL.md')));
+});
+
+test('--out must be a directory, and a target must not be one', () => {
+  const cwd = withAnswers(minimalAnswers());
+  writeFileSync(join(cwd, 'afile'), 'x');
+  const out = run(['--answers', 'answers.json', '--out', 'afile'], { cwd });
+  assert.equal(out.code, 2);
+  assert.match(out.stderr, /is not a directory/);
+  mkdirSync(join(cwd, 'saved'));
+  const save = run(['--answers', 'answers.json', '--save-answers', 'saved'], { cwd });
+  assert.equal(save.code, 1);
+  assert.match(save.stderr, /saved is a directory/);
+  assert.ok(!existsSync(join(cwd, 'NOT_A_DRILL.md')));
+});
+
+test('the answers file is UTF-8, with or without a byte order mark', () => {
+  const cwd = scratchDir();
+  writeFileSync(join(cwd, 'bom.json'), `\uFEFF${JSON.stringify(minimalAnswers())}`);
+  assert.equal(run(['--answers', 'bom.json', '--out', 'a'], { cwd }).code, 0);
+  writeFileSync(join(cwd, 'latin1.json'), Buffer.from(JSON.stringify({ ...minimalAnswers(), owner: 'Coopérative' }), 'latin1'));
+  const latin1 = run(['--answers', 'latin1.json', '--out', 'b'], { cwd });
+  assert.equal(latin1.code, 2);
+  assert.match(latin1.stderr, /not UTF-8/);
+});
+
+test('check reports an unreadable sign and goes on with the others', () => {
+  const cwd = withAnswers(fullAnswers());
+  assert.equal(run(['--answers', 'answers.json'], { cwd }).code, 0);
+  mkdirSync(join(cwd, 'NOT_A_DRILL.de.md'));
+  const result = run(['check'], { cwd });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /NOT_A_DRILL\.de\.md: cannot read \(EISDIR\)/);
+  assert.match(result.stdout, /NOT_A_DRILL\.fr\.md: ok\nNOT_A_DRILL\.md: ok/);
+});
+
+test('--no-input without answers says what is missing', () => {
+  const result = run(['--no-input']);
+  assert.equal(result.code, 2);
+  assert.match(result.stderr, /--no-input needs --answers <file>/);
 });

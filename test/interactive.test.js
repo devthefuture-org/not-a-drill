@@ -8,10 +8,11 @@ import { NOW, scratchDir } from './helpers/fixtures.js';
 
 // Runs the CLI in process with a fake terminal on stdin. `lines` are typed
 // ahead; when `end` is true the input then closes, like Ctrl-D.
-async function session(lines, { args = [], cwd = scratchDir(), end = true } = {}) {
+async function session(lines, { args = [], cwd = scratchDir(), end = true, stdoutIsTTY = true } = {}) {
   const stdin = new PassThrough();
   stdin.isTTY = true;
   const stdout = new PassThrough();
+  stdout.isTTY = stdoutIsTTY;
   const stderr = new PassThrough();
   let out = '';
   let err = '';
@@ -30,10 +31,10 @@ const ENGLISH_SESSION = [
   'ACME Cooperative',
   'running its shop',
   'not an address', // refused, asked again
-  'security@acme.test',
+  'security@acme-cooperative.org',
   '', // response time: 72 hours
   '', // no emergency contact
-  'https://acme.test',
+  'https://acme-cooperative.org',
   '', // guest room: no
   '', // "at least" list: yes
   '', // cooperation: no
@@ -47,12 +48,12 @@ const ENGLISH_SESSION = [
 test('an English session writes the sign', async () => {
   const { code, out, cwd } = await session(ENGLISH_SESSION);
   assert.equal(code, 0, out);
-  assert.match(out, /Give an email address or an http\(s\) URL\./);
+  assert.match(out, /Give an email address or an https URL\./);
   assert.deepEqual(readdirSync(cwd), ['NOT_A_DRILL.md']);
   const text = readFileSync(join(cwd, 'NOT_A_DRILL.md'), 'utf8');
-  assert.match(text, /^\*NOT_A_DRILL\.md v0\.1 · 2026-11-23 · contact: security@acme\.test\*$/m);
+  assert.match(text, /^\*NOT_A_DRILL\.md v0\.1 · 2026-11-23 · contact: security@acme-cooperative\.org\*$/m);
   assert.match(text, /answers within 72 hours\.\n/);
-  assert.match(text, /One thing is allowed, and nothing else\.\n\n- \*\*Reading what is public\*\*: https:\/\/acme\.test\./);
+  assert.match(text, /One thing is allowed, and nothing else\.\n\n- \*\*Reading what is public\*\*: https:\/\/acme-cooperative\.org\./);
   assert.match(text, /Changes from the template: removed the guest room, the emergency contact, and the cooperation section\./);
 });
 
@@ -64,19 +65,19 @@ test('a French session in both languages asks the texts twice', async () => {
     'Coopérative ACME',
     'faire tourner sa boutique', // activity [fr]
     'running its shop', // activity [en]
-    'https://acme.test/contact',
+    'https://acme-cooperative.org/contact',
     '', // 72 heures
     '', // 72 hours
     '+33 1 23 45 67 89',
     '',
     'o', // guest room
-    'https://guest.acme.test',
+    'https://guest.acme-cooperative.org',
     '100 requêtes par jour',
     '100 requests per day',
     'n', // no "at least" list
     'n',
     '2026-12-01',
-    'https://acme.test',
+    'https://acme-cooperative.org',
     '', // snippets: yes
     '',
     'o', // save the answers
@@ -139,4 +140,32 @@ test('answering "no" to the final confirmation writes nothing', async () => {
   const { code, cwd } = await session(lines.slice(0, -1));
   assert.equal(code, 1);
   assert.ok(!existsSync(join(cwd, 'NOT_A_DRILL.md')));
+});
+
+test('an answer that cannot go into the sign is asked again on the spot', async () => {
+  const lines = [...ENGLISH_SESSION];
+  lines.splice(3, 1, 'ACME [EU]', 'ACME Cooperative');
+  lines.splice(lines.indexOf('security@acme-cooperative.org'), 0, 'http://acme-cooperative.org/security');
+  const { code, out, cwd } = await session(lines);
+  assert.equal(code, 0, out);
+  assert.match(out, /\[EU\] looks like an unfilled field of the template\./);
+  assert.match(out, /Use https: security\.txt \(RFC 9116\) accepts only https web contacts\./);
+  assert.match(readFileSync(join(cwd, 'NOT_A_DRILL.md'), 'utf8'), /It belongs to ACME Cooperative,/);
+});
+
+test('with an answers file on a terminal, the overwrite question speaks the language of the sign', async () => {
+  const cwd = scratchDir();
+  writeFileSync(join(cwd, 'NOT_A_DRILL.md'), 'mine\n');
+  writeFileSync(join(cwd, 'answers.json'), JSON.stringify({ realSystem: true, languages: ['fr'], owner: 'ACME', activity: 'vendre', contact: 'sec@acme-cooperative.org', responseTime: '72 heures' }));
+  const { code, out } = await session(['n'], { cwd, args: ['--answers', 'answers.json'] });
+  assert.equal(code, 1);
+  assert.match(out, /Certains de ces fichiers existent déjà\. Les remplacer \?\n› \(o\/N\)/);
+  assert.equal(readFileSync(join(cwd, 'NOT_A_DRILL.md'), 'utf8'), 'mine\n');
+});
+
+test('without a terminal on stdout, no question is asked', async () => {
+  const { code, err, cwd } = await session(ENGLISH_SESSION, { stdoutIsTTY: false });
+  assert.equal(code, 2);
+  assert.match(err, /pass --answers <file>/);
+  assert.deepEqual(readdirSync(cwd), []);
 });
