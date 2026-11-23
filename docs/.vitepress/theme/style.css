@@ -1,0 +1,21 @@
+:root {
+  --vp-c-brand-1: #b91c1c;
+  --vp-c-brand-2: #dc2626;
+  --vp-c-brand-3: #b91c1c;
+  --vp-c-brand-soft: rgba(185, 28, 28, 0.14);
+}
+
+.dark {
+  --vp-c-brand-1: #f87171;
+  --vp-c-brand-2: #ef4444;
+  --vp-c-brand-3: #b91c1c;
+  --vp-c-brand-soft: rgba(248, 113, 113, 0.16);
+}
+
+/* Prompts are prose: wrap them instead of scrolling sideways. The copy
+   button still copies the original lines. */
+.vp-doc div.language-text pre,
+.vp-doc div.language-text code {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
