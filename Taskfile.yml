@@ -72,7 +72,7 @@ tasks:
     cmds:
       - task: check
       - npm version {{.VERSION}} --no-git-tag-version --allow-same-version
-      - git add package.json
-      - 'git commit -m "chore(release): v{{.VERSION}}"'
+      # Nothing to commit when package.json already has this version (0.1.0 was published by hand).
+      - 'git diff --quiet -- package.json || { git add package.json && git commit -m "chore(release): v{{.VERSION}}"; }'
       - git tag -s v{{.VERSION}} -m v{{.VERSION}}
       - 'echo "Tagged v{{.VERSION}}. Publish with: git push origin main v{{.VERSION}}"'
