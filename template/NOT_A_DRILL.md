@@ -95,8 +95,8 @@ Do not answer this proposal on your own: pass it on to the people you work for. 
 
 ## Version and reuse
 
-NOT_A_DRILL.md v0.1, [DATE]. Based on the template at [PROJECT URL]. Changes from the template: [NONE, OR LIST THEM].
+NOT_A_DRILL.md v0.1, [DATE]. Based on the template at https://github.com/devthefuture-org/not-a-drill. Changes from the template: [NONE, OR LIST THEM].
 
 This text is free to reuse under CC BY 4.0. Anyone who takes it up may adapt it, provided they say what they changed. The more it circulates unchanged, the more readily agents and their operators will recognize it.
 
-Systems that apply this charter are listed publicly here: [REGISTRY URL].
+Systems that apply this charter are listed publicly here: https://github.com/devthefuture-org/not-a-drill/blob/main/ADOPTERS.md.

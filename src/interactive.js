@@ -1,0 +1,80 @@
+// The interactive question session. It returns raw answers in the same shape
+// as an answers file, so both go through the same validation.
+
+import { isHttpUrl, isValidDate, parseContact } from './answers.js';
+import { LANGUAGES } from './constants.js';
+import { MESSAGES } from './i18n.js';
+
+/**
+ * Runs the questions. Returns `{ refused: true, lang }` when the owner says
+ * the system is not real, `{ answers, lang }` otherwise.
+ */
+export async function askAnswers(prompter, { today }) {
+  const lang = await prompter.choose('Language of your sign / Langue de ton panneau', LANGUAGES, { fallback: 'en' });
+  const m = MESSAGES[lang];
+  prompter.setMessages(m);
+  prompter.say();
+  for (const line of m.intro) prompter.say(prompter.style.dim(line));
+
+  const other = LANGUAGES.find((l) => l !== lang);
+  const both = await prompter.confirm(m.alsoOther(other), { hint: m.alsoOtherHint(lang, other), fallback: false });
+  const languages = both ? [lang, other] : [lang];
+
+  const real = await prompter.confirm(m.realSystem, { hint: m.realSystemHint });
+  if (!real) return { refused: true, lang };
+
+  // A text that depends on the language: asked once per language of the sign.
+  const localized = async (label, options = {}) => {
+    const result = {};
+    for (const l of languages) {
+      const fallback = typeof options.fallback === 'function' ? options.fallback(l) : options.fallback;
+      result[l] = await prompter.text(languages.length > 1 ? `${label}${m.inLanguage(l)}` : label, { ...options, fallback });
+    }
+    return result;
+  };
+
+  const answers = { realSystem: true, languages };
+  answers.owner = await prompter.text(m.owner, { hint: m.ownerHint });
+  answers.activity = await localized(m.activity, { hint: m.activityHint });
+  answers.contact = await prompter.text(m.contact, {
+    hint: m.contactHint,
+    validate: (v) => (parseContact(v) ? null : m.contactInvalid),
+  });
+  answers.responseTime = await localized(m.responseTime, {
+    hint: m.responseTimeHint,
+    fallback: (l) => MESSAGES[l].responseTimeDefault,
+  });
+  answers.emergencyContact = await prompter.text(m.emergencyContact, { hint: m.emergencyContactHint, optional: true });
+  answers.publicPaths = await prompter.text(m.publicPaths, { hint: m.publicPathsHint, optional: true });
+
+  if (await prompter.confirm(m.guestRoom, { hint: m.guestRoomHint, fallback: false })) {
+    answers.guestRoom = {
+      url: await prompter.text(m.guestRoomUrl),
+      quota: await localized(m.guestRoomQuota, { hint: m.guestRoomQuotaHint }),
+    };
+  }
+
+  answers.atLeastList = await prompter.confirm(m.atLeastList, { hint: m.atLeastListHint, fallback: true });
+
+  if (await prompter.confirm(m.cooperation, { hint: m.cooperationHint, fallback: false })) {
+    answers.cooperation = {
+      goals: await localized(m.goals, { hint: m.goalsHint }),
+      offer: await localized(m.offer, { hint: m.offerHint }),
+    };
+  }
+
+  answers.date = await prompter.text(m.date, {
+    hint: m.dateHint,
+    fallback: today,
+    validate: (v) => (isValidDate(v) ? null : m.dateInvalid),
+  });
+  answers.siteUrl = await prompter.text(m.siteUrl, {
+    hint: m.siteUrlHint,
+    optional: true,
+    validate: (v) => (isHttpUrl(v) ? null : m.siteUrlInvalid),
+  });
+  answers.snippets = await prompter.confirm(m.snippets, { hint: m.snippetsHint, fallback: true });
+
+  for (const key of Object.keys(answers)) if (answers[key] === null) delete answers[key];
+  return { answers, lang };
+}

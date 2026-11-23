@@ -1,0 +1,43 @@
+{
+  "name": "not-a-drill",
+  "version": "0.1.0",
+  "description": "Generate a NOT_A_DRILL.md: a plain-text sign that tells AI agents this system is real, who owns it, what is allowed, and how to reach a human.",
+  "keywords": [
+    "ai-agents",
+    "ai-safety",
+    "security",
+    "security-txt",
+    "agents-md",
+    "llms-txt",
+    "cli"
+  ],
+  "homepage": "https://devthefuture-org.github.io/not-a-drill/",
+  "bugs": "https://github.com/devthefuture-org/not-a-drill/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/devthefuture-org/not-a-drill.git"
+  },
+  "license": "MIT AND CC-BY-4.0",
+  "author": "DevTheFuture",
+  "type": "module",
+  "bin": {
+    "not-a-drill": "bin/not-a-drill.js"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "LICENSE",
+    "LICENSE-CC-BY-4.0"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "build:reference": "node scripts/build-reference.js"
+  }
+}

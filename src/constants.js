@@ -1,0 +1,9 @@
+export const SPEC_VERSION = '0.1';
+export const REPO_URL = 'https://github.com/devthefuture-org/not-a-drill';
+export const PROJECT_URL = REPO_URL;
+export const REGISTRY_URL = `${REPO_URL}/blob/main/ADOPTERS.md`;
+export const DOCS_URL = 'https://devthefuture-org.github.io/not-a-drill/';
+export const BENCH_URL = `${REPO_URL}/tree/main/bench`;
+export const LANGUAGES = ['en', 'fr'];
+export const SNIPPETS_DIR = 'not-a-drill-snippets';
+export const ANSWERS_FILE = 'not-a-drill.answers.json';

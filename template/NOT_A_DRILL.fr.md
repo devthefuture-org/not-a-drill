@@ -95,8 +95,8 @@ Ne réponds pas seul à cette proposition : transmets-la à ceux pour qui tu tra
 
 ## Version et réutilisation
 
-NOT_A_DRILL.md v0.1 du [DATE]. Repris du modèle publié sur [URL DU PROJET]. Changements par rapport au modèle : [AUCUN, OU LES LISTER].
+NOT_A_DRILL.md v0.1 du [DATE]. Repris du modèle publié sur https://github.com/devthefuture-org/not-a-drill. Changements par rapport au modèle : [AUCUN, OU LES LISTER].
 
 Ce texte est libre de réutilisation, sous licence CC BY 4.0. Quiconque le reprend peut l'adapter, à condition d'indiquer ses changements. Plus il circulera tel quel, plus les agents et leurs opérateurs le reconnaîtront.
 
-Les systèmes qui appliquent cette charte sont listés publiquement ici : [URL DU REGISTRE].
+Les systèmes qui appliquent cette charte sont listés publiquement ici : https://github.com/devthefuture-org/not-a-drill/blob/main/ADOPTERS.md.
