@@ -27,15 +27,15 @@ Paste this into your coding agent (Claude Code, Codex, Cursor…), in the reposi
 ```text
 Help me put a NOT_A_DRILL.md on a system I own.
 
-NOT_A_DRILL.md is a plain-text sign for AI agents that arrive on a system: it says the system is real, who owns it, what is allowed, and how to reach a human. Guide: https://devthefuture-org.github.io/not-a-drill/
+NOT_A_DRILL.md is a plain-text sign for AI agents that arrive on a system: it says the system is real, who owns it, what is allowed, and how to reach a human. Guide: https://devthefuture-org.github.io/not-a-drill/guide
 
 1. First ask me whether this system is real and in production. If it is a test environment, a honeypot or a decoy, stop: the sign must never go there.
-2. Interview me, a few questions at a time: the language of the sign (en, fr, or both); who owns the system and what they depend on it for; a contact that a human actually reads, and the response time I commit to; an emergency contact; what is public; whether a real guest room exists (isolated, no secrets, quota enforced by the machine); whether to keep the "at least" list for uninvited agents; whether I am open to cooperation. Never invent an answer, a contact, monitoring or a threat. If I do not know, leave the option out.
-3. Write my answers to not-a-drill.answers.json (format: https://devthefuture-org.github.io/not-a-drill/cli#answers-file), then run:
-   npx not-a-drill --answers not-a-drill.answers.json --no-input
-   If you cannot run commands, fill in https://raw.githubusercontent.com/devthefuture-org/not-a-drill/main/template/NOT_A_DRILL.md yourself, remove the optional parts I do not use, and list what you removed in its last section.
-4. Run npx not-a-drill check, show me the full text, and wait for my approval.
-5. Then propose where to place it and which snippets to use (login banner, config file headers, AGENTS.md, llms.txt, security.txt). Change no file or configuration without my go-ahead.
+2. Interview me, a few questions at a time: the language of the sign (en, fr, or both); who owns the system and what they depend on it for; a contact that a human actually reads, and the response time I commit to; an emergency contact; what is public; whether a real guest room exists (isolated, no secrets, quota enforced by the machine), and if so its URL and quota; whether to keep the "at least" list for uninvited agents; whether I am open to cooperation, and if so what I look for and what I offer; the website where the file will be published, if any. Never invent an answer, a contact, monitoring or a threat. If I do not know, leave the option out.
+3. Write my answers to not-a-drill-draft/answers.json (format: https://devthefuture-org.github.io/not-a-drill/cli#answers-file), then generate a draft, which touches nothing else:
+   npx --yes not-a-drill --answers not-a-drill-draft/answers.json --no-input --out not-a-drill-draft
+   If the command fails, if npx is missing, or if a file already exists, stop and tell me: never pass --force, and never install anything without my go-ahead. If you cannot run commands, fill in https://raw.githubusercontent.com/devthefuture-org/not-a-drill/main/template/NOT_A_DRILL.md (or NOT_A_DRILL.fr.md) yourself instead: remove the optional parts I do not use, fix the sentence that counts what is allowed, list what you removed in its last section, and name the file NOT_A_DRILL.md.
+4. Run npx --yes not-a-drill check not-a-drill-draft/NOT_A_DRILL*.md, show me the full text, and wait for my approval.
+5. Then propose where to place the sign and the snippets written in not-a-drill-draft/not-a-drill-snippets/ (login banner, config file headers, AGENTS.md, llms.txt, security.txt). Move or change no file or configuration without my go-ahead.
 ```
 <!-- #endregion adopt-prompt -->
 

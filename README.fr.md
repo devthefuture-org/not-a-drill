@@ -27,15 +27,15 @@ Collez ceci dans votre agent de code (Claude Code, Codex, Cursor…), dans le d�
 ```text
 Aide-moi à poser un NOT_A_DRILL.md sur un système qui m'appartient.
 
-NOT_A_DRILL.md est un panneau en texte brut pour les agents IA qui arrivent sur un système : il dit que le système est réel, à qui il appartient, ce qui y est permis, et comment joindre un humain. Guide : https://devthefuture-org.github.io/not-a-drill/fr/
+NOT_A_DRILL.md est un panneau en texte brut pour les agents IA qui arrivent sur un système : il dit que le système est réel, à qui il appartient, ce qui y est permis, et comment joindre un humain. Guide : https://devthefuture-org.github.io/not-a-drill/fr/guide
 
 1. Demande-moi d'abord si ce système est réel et en production. Si c'est un environnement de test, un pot de miel ou un leurre, arrête-toi : le panneau ne doit jamais y aller.
-2. Interroge-moi, quelques questions à la fois : la langue du panneau (en, fr, ou les deux) ; à qui appartient le système et pour quoi il en dépend ; un contact réellement lu par un humain, et le délai de réponse auquel je m'engage ; un contact d'urgence ; ce qui est public ; s'il existe une vraie chambre d'amis (isolée, sans secret, quota appliqué par la machine) ; s'il faut garder la liste « au moins » pour les agents entrés sans invitation ; si je suis ouvert à une coopération. N'invente jamais une réponse, un contact, une surveillance ou une menace. Si je ne sais pas, laisse l'option de côté.
-3. Écris mes réponses dans not-a-drill.answers.json (format : https://devthefuture-org.github.io/not-a-drill/fr/cli#fichier-de-reponses), puis lance :
-   npx not-a-drill --answers not-a-drill.answers.json --no-input
-   Si tu ne peux pas lancer de commande, remplis toi-même https://raw.githubusercontent.com/devthefuture-org/not-a-drill/main/template/NOT_A_DRILL.fr.md, retire les parties facultatives que je n'utilise pas, et liste ce que tu as retiré dans sa dernière section.
-4. Lance npx not-a-drill check, montre-moi le texte complet, et attends mon accord.
-5. Propose ensuite où le placer et quels extraits utiliser (bannière de connexion, en-têtes de fichiers de configuration, AGENTS.md, llms.txt, security.txt). Ne modifie aucun fichier ni aucune configuration sans mon feu vert.
+2. Interroge-moi, quelques questions à la fois : la langue du panneau (en, fr, ou les deux) ; à qui appartient le système et pour quoi il en dépend ; un contact réellement lu par un humain, et le délai de réponse auquel je m'engage ; un contact d'urgence ; ce qui est public ; s'il existe une vraie chambre d'amis (isolée, sans secret, quota appliqué par la machine), et si oui son URL et son quota ; s'il faut garder la liste « au moins » pour les agents entrés sans invitation ; si je suis ouvert à une coopération, et si oui ce que je cherche et ce que j'offre ; le site où le fichier sera publié, s'il y en a un. N'invente jamais une réponse, un contact, une surveillance ou une menace. Si je ne sais pas, laisse l'option de côté.
+3. Écris mes réponses dans not-a-drill-draft/answers.json (format : https://devthefuture-org.github.io/not-a-drill/fr/cli#fichier-de-reponses), puis génère un brouillon, qui ne touche à rien d'autre :
+   npx --yes not-a-drill --answers not-a-drill-draft/answers.json --no-input --out not-a-drill-draft
+   Si la commande échoue, si npx manque, ou si un fichier existe déjà, arrête-toi et dis-le-moi : ne passe jamais --force, et n'installe rien sans mon feu vert. Si tu ne peux pas lancer de commande, remplis plutôt toi-même https://raw.githubusercontent.com/devthefuture-org/not-a-drill/main/template/NOT_A_DRILL.fr.md (ou NOT_A_DRILL.md pour l'anglais) : retire les parties facultatives que je n'utilise pas, corrige la phrase qui compte ce qui est permis, liste ce que tu as retiré dans sa dernière section, et nomme le fichier NOT_A_DRILL.md.
+4. Lance npx --yes not-a-drill check not-a-drill-draft/NOT_A_DRILL*.md, montre-moi le texte complet, et attends mon accord.
+5. Propose ensuite où placer le panneau et les extraits écrits dans not-a-drill-draft/not-a-drill-snippets/ (bannière de connexion, en-têtes de fichiers de configuration, AGENTS.md, llms.txt, security.txt). Ne déplace ni ne modifie aucun fichier ni aucune configuration sans mon feu vert.
 ```
 <!-- #endregion adopt-prompt -->
 

@@ -44,9 +44,9 @@ npx not-a-drill check [fichiers...]  vérifier des panneaux (par défaut : ./NOT
 -v, --version                 afficher la version
 ```
 
-## Fichier de réponses
+## Fichier de réponses {#fichier-de-reponses}
 
-Scripts, serveurs et agents IA passent les réponses dans un fichier JSON :
+Scripts, serveurs et agents IA passent les réponses dans un fichier JSON. L'exemple ci-dessous montre le format : remplacez chaque valeur, car la CLI refuse les noms réservés aux exemples et aux tests (`example.com`, `*.example`, `*.test`…) et un panneau demande un vrai contact.
 
 ```sh
 npx not-a-drill --answers not-a-drill.answers.json --no-input
@@ -78,26 +78,30 @@ npx not-a-drill --answers not-a-drill.answers.json --no-input
 | `date` | `"AAAA-MM-JJ"` | non, aujourd'hui | Date de cette version du panneau. |
 | `owner` | chaîne | oui | Complète « Il appartient à ___ ». |
 | `activity` | texte | oui | Complète « qui en dépend pour ___ ». |
-| `contact` | chaîne | oui | Une adresse e-mail ou une URL http(s) lue par un humain. |
+| `contact` | chaîne | oui | Une adresse e-mail ou une URL https lue par un humain (RFC 9116 n'accepte que des contacts web en https). |
 | `responseTime` | texte | oui | Complète « répond sous ___ ». |
 | `emergencyContact` | chaîne | non | À omettre si vous n'en avez pas. |
 | `publicPaths` | chaîne | non | Chemins ou URL que les agents peuvent lire. À omettre si rien n'est public. |
 | `guestRoom` | `{ "url": chaîne, "quota": texte }` | non | Seulement si la chambre d'amis existe pour de bon : isolée, sans secret, avec un quota appliqué par la machine. |
 | `atLeastList` | booléen | non, `true` | Garde la liste « au moins » dans la section destinée aux agents entrés sans invitation. |
 | `cooperation` | `{ "goals": texte, "offer": texte }` | non | Ce que vous cherchez, et ce que vous pouvez offrir. |
-| `siteUrl` | URL http(s) | non | Site où le fichier est publié. Ajoute les extraits llms.txt et security.txt. |
+| `siteUrl` | URL http(s), sans requête ni fragment | non | Site où le fichier est publié, à sa racine. Ajoute les extraits llms.txt et security.txt. |
 | `snippets` | booléen | non, `true` | Écrit les extraits de placement. |
 
-Un *texte* dépend de la langue : une simple chaîne quand le panneau a une seule langue, sinon un objet avec une entrée par langue, comme `{ "fr": "72 heures", "en": "72 hours" }`. Chaque valeur tient sur une ligne. `null`, `false` ou une clé absente écarte une partie facultative. Une clé inconnue est une erreur, et tous les problèmes sont signalés d'un coup.
+Un *texte* dépend de la langue : une simple chaîne quand le panneau a une seule langue, sinon un objet avec une entrée par langue, comme `{ "fr": "72 heures", "en": "72 hours" }`.
+
+Chaque valeur est du texte simple sur une ligne, sans caractère de contrôle. Une valeur qui ressemble à un champ du modèle, comme `[EU]`, est refusée. Dans les fichiers Markdown, `*`, `<`, les accents graves et les barres obliques inverses sont échappés pour s'afficher tels que saisis. Un point final est retiré là où la phrase apporte le sien.
+
+`null`, `false` ou une clé absente écarte `emergencyContact`, `publicPaths`, `guestRoom`, `cooperation` et `siteUrl`. `atLeastList` et `snippets` prennent `true` ou `false`, et valent `true` par défaut. Une clé inconnue est une erreur, et tous les problèmes sont signalés d'un coup.
 
 ## Vérifier un panneau
 
 ```sh
-npx not-a-drill check                    # tous les NOT_A_DRILL*.md du dossier courant
+npx not-a-drill check                    # NOT_A_DRILL.md et NOT_A_DRILL.<langue>.md du dossier courant
 npx not-a-drill check /NOT_A_DRILL.md    # les fichiers indiqués
 ```
 
-`check` signale chaque champ resté entre crochets, l'absence de la ligne qui porte la version et la date, et l'absence de contact sur cette ligne.
+`check` signale chaque champ resté entre crochets, même échappé (`\[CONTACT\]`), coupé sur deux lignes ou transformé en lien ; une date absente ou impossible à côté de la version ; et l'absence de contact sur cette ligne.
 
 ## Codes de sortie
 
@@ -113,9 +117,10 @@ npx not-a-drill check /NOT_A_DRILL.md    # les fichiers indiqués
 Gardez le fichier de réponses avec la configuration du serveur, et générez le panneau à partir de lui :
 
 ```sh
-npx not-a-drill --answers not-a-drill.answers.json --no-input --out ./panneau
-sudo install -m 644 ./panneau/NOT_A_DRILL.md /NOT_A_DRILL.md
-sudo sh -c 'cat ./panneau/not-a-drill-snippets/motd.txt >> /etc/motd'
+npx --yes not-a-drill --answers not-a-drill.answers.json --no-input --out ./panneau
+sudo install -m 644 ./panneau/NOT_A_DRILL*.md /
 ```
 
-Copiez aussi `NOT_A_DRILL.md` dans le répertoire personnel de chaque compte de service, et placez `config-header.txt` en tête des fichiers de configuration qui acceptent les commentaires `#`. Pour mettre le panneau à jour, changez les réponses (au moins la `date`) et régénérez avec `--force`.
+Ajoutez `./panneau/not-a-drill-snippets/motd.txt` à la bannière de connexion (`/etc/motd`), copiez le panneau dans le répertoire personnel de chaque compte de service, et placez `config-header.txt` en tête des fichiers de configuration qui acceptent les commentaires `#`.
+
+Pour mettre le panneau à jour, changez les réponses (au moins la `date`), régénérez avec `--force`, réinstallez les fichiers, et remplacez les lignes de l'ancienne bannière et des en-têtes au lieu d'en ajouter. La date `Expires` de security.txt part du jour de la génération.
