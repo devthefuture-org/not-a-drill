@@ -2,7 +2,8 @@
 
 NOT_A_DRILL.md convention (v0.1 draft) + the `not-a-drill` npm CLI + the VitePress site.
 Repo `devthefuture-org/not-a-drill`, site https://devthefuture-org.github.io/not-a-drill/,
-npm `not-a-drill`. `devbox install && task` lists everything; `task check` is the gate CI runs.
+npm `not-a-drill` (0.1.0 published by hand on 2026-11-23). `devbox install && task` lists everything;
+`task check` is the gate CI runs. Open follow-ups: issues #4 (low hardening checklist) and #6.
 
 ## Locked decisions
 
@@ -27,5 +28,9 @@ npm `not-a-drill`. `devbox install && task` lists everything; `task check` is th
   then the trusted publisher is configured on npmjs.com (org devthefuture-org, repo not-a-drill,
   workflow `release.yml`, direct publish allowed). npm expires a configuration that has not
   published within 2 days: configure it right before pushing the next release tag.
+- npm publishing needs 2FA in the browser: from an agent's background shell it fails (EOTP without a TTY;
+  in a pty the auth links expire within minutes). Hand Jo the command to run in his own terminal:
+  `builtin cd <repo> && devbox run -- npm publish --access public` (his shell's `cd` hook calls fnm).
+- A new package is staged a minute or two (`0.0.0-stage`) before the version shows on the registry.
 - In the Taskfile, quote any command containing `: ` (YAML reads it as a mapping).
 - npm 11 skips esbuild's postinstall in docs/; the VitePress build works without it.
