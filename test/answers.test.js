@@ -154,7 +154,7 @@ test('URLs are accepted only as they will be printed', () => {
   ]) {
     assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
   }
-  for (const siteUrl of ['https://acme-cooperative.org/?', 'https://acme-cooperative.org#', 'https://acme-cooperative.org/a b', 'https:\\\\acme-cooperative.org\\docs']) {
+  for (const siteUrl of ['https://acme-cooperative.org/?', 'https://acme-cooperative.org#', 'https://acme-cooperative.org/a b', 'https:\\\\acme-cooperative.org\\docs', 'https:///acme-cooperative.org', 'https://a!b.org']) {
     assert.deepEqual(problemsOf({ ...minimalAnswers(), siteUrl }).map((p) => p.path), ['siteUrl'], siteUrl);
   }
   const answers = normalizeAnswers({ ...minimalAnswers(), contact: 'https://Acme-Cooperative.org/contact/security-team', siteUrl: 'https://acme-cooperative.org/docs/' });
@@ -162,9 +162,19 @@ test('URLs are accepted only as they will be printed', () => {
   assert.equal(answers.siteUrl, 'https://acme-cooperative.org/docs');
 });
 
-test('an email address that a mailto: URI would cut is refused', () => {
-  for (const contact of ['jo#1@acme-cooperative.org', 'jo%41@acme-cooperative.org', 'jo|ops@acme-cooperative.org', 'jo{x}@acme-cooperative.org']) {
+test('an email address that a mailto: URI or a Markdown renderer would cut is refused', () => {
+  // GitHub links only letters, digits, `.`, `_`, `+` and `-` before the @: `o'brien@x` would link brien@x.
+  for (const contact of ['jo#1@acme-cooperative.org', 'jo%41@acme-cooperative.org', 'jo|ops@acme-cooperative.org', 'jo{x}@acme-cooperative.org', "o'brien@acme-cooperative.org", 'a/b@acme-cooperative.org', 'a!b@acme-cooperative.org', '.a@acme-cooperative.org', 'a..b@acme-cooperative.org', 'a.@acme-cooperative.org']) {
     assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
   }
-  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: "o'brien+sec@acme-cooperative.org" }).contact, "o'brien+sec@acme-cooperative.org");
+  assert.equal(normalizeAnswers({ ...minimalAnswers(), contact: 'first.last+sec@acme-cooperative.org' }).contact, 'first.last+sec@acme-cooperative.org');
+});
+
+test('a contact URL holds a plain host name and no parentheses', () => {
+  for (const contact of ['https://acme(eu).org/contact', 'https://acme-cooperative.org/report(2026)', 'https://a!b.org/contact', 'https://a,b.org/contact']) {
+    assert.deepEqual(problemsOf({ ...minimalAnswers(), contact }).map((p) => p.path), ['contact'], contact);
+  }
+  for (const contact of ['https://acme-cooperative.org:8443/contact?topic=security', 'https://acme-cooperative.org/contact%20us/']) {
+    assert.equal(normalizeAnswers({ ...minimalAnswers(), contact }).contact, contact);
+  }
 });

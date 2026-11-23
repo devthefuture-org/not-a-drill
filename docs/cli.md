@@ -80,7 +80,7 @@ npx not-a-drill --answers not-a-drill.answers.json --no-input
 | `date` | `"YYYY-MM-DD"` | no, today | Date of this version of the sign. |
 | `owner` | string | yes | Completes "It belongs to ___". |
 | `activity` | text | yes | Completes "who depend on it for ___". |
-| `contact` | string | yes | An email address or an https URL that a human reads (RFC 9116 accepts only https web contacts). |
+| `contact` | string | yes | An email address or an https URL that a human reads. Before the `@`, letters, digits, `.`, `_`, `+` and `-` only. A URL is written in ASCII, with spaces and accented letters percent-encoded (`%20`, `%C3%A9`), and https only (RFC 9116). |
 | `responseTime` | text | yes | Completes "answers within ___". |
 | `emergencyContact` | string | no | Leave it out if you have none. |
 | `publicPaths` | string | no | Paths or URLs that agents may read. Leave it out if nothing is public. |
@@ -110,7 +110,7 @@ npx not-a-drill check /NOT_A_DRILL.md    # given files
 | Code | Meaning |
 | --- | --- |
 | `0` | Done. |
-| `1` | Refused (not a real system, existing files without `--force`, write declined), or problems found by `check`. |
+| `1` | Refused (not a real system, existing files without `--force`, files from an earlier sign in `--out`, write declined), or problems found by `check`. |
 | `2` | Usage error or invalid answers. |
 | `130` | Cancelled. |
 

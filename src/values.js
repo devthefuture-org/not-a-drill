@@ -70,9 +70,13 @@ function parseUrl(value) {
 // only, without the characters a URI or Markdown would read differently.
 const URL_UNSAFE = /[^\x21-\x7e]|[\\"{}|^[\]<>*`]/;
 
-// ASCII only, without `*` or backquotes (Markdown) and without the characters
-// a mailto: URI must encode (`?`, `#`, `%`, `{`, `|`, `}`, `^`…).
-const EMAIL = /^[A-Za-z0-9.!$&'+/=_~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+// A host name: dot-separated labels of letters, digits and inner hyphens.
+const HOST = /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+
+// The local part GitHub and other Markdown renderers link as a whole
+// (letters, digits, `.`, `_`, `+`, `-`; no leading, trailing or doubled dot):
+// with any other character, the rendered link points to another mailbox.
+const EMAIL_LOCAL = /^[A-Za-z0-9_+-]+(?:\.[A-Za-z0-9_+-]+)*$/;
 
 /** Why a contact cannot be used: 'format', 'http' or 'reserved'; null when it can. */
 export function contactProblem(value) {
@@ -81,13 +85,15 @@ export function contactProblem(value) {
     if (!url || !['https:', 'http:'].includes(url.protocol) || url.hostname === '') return 'format';
     // RFC 9116: a web URI in security.txt must begin with https://.
     if (url.protocol !== 'https:') return 'http';
-    // The sign prints the contact as typed, before a period.
-    if (!/^https:\/\/[^/]/i.test(value) || URL_UNSAFE.test(value) || value.endsWith('.')) return 'format';
-    return isReservedHost(url.hostname) ? 'reserved' : null;
+    // The sign prints the contact as typed, before a period, and `check` reads it up to a parenthesis.
+    if (!/^https:\/\/[^/]/i.test(value) || URL_UNSAFE.test(value) || /[()]/.test(value) || value.endsWith('.')) return 'format';
+    if (isReservedHost(url.hostname)) return 'reserved';
+    return HOST.test(url.hostname) ? null : 'format';
   }
   const address = value.replace(/^mailto:/i, '');
-  if (!EMAIL.test(address)) return 'format';
-  return isReservedHost(address.slice(address.lastIndexOf('@') + 1)) ? 'reserved' : null;
+  const at = address.lastIndexOf('@');
+  if (at < 1 || !EMAIL_LOCAL.test(address.slice(0, at)) || !HOST.test(address.slice(at + 1))) return 'format';
+  return isReservedHost(address.slice(at + 1)) ? 'reserved' : null;
 }
 
 /** A contact as written in the sign (`display`) and as a URI (`uri`), or null. */
@@ -105,5 +111,6 @@ export function siteUrlProblem(value) {
   // The URL goes inside a Markdown link in llms.txt.
   if (!/^https?:\/\/[^/]/i.test(value) || URL_UNSAFE.test(value) || /[()]/.test(value)) return 'format';
   if (/[?#]/.test(value)) return 'query';
-  return isReservedHost(url.hostname) ? 'reserved' : null;
+  if (isReservedHost(url.hostname)) return 'reserved';
+  return HOST.test(url.hostname) ? null : 'format';
 }

@@ -80,7 +80,7 @@ npx not-a-drill --answers not-a-drill.answers.json --no-input
 | `date` | `"AAAA-MM-JJ"` | non, aujourd'hui | Date de cette version du panneau. |
 | `owner` | chaîne | oui | Complète « Il appartient à ___ ». |
 | `activity` | texte | oui | Complète « qui en dépend pour ___ ». |
-| `contact` | chaîne | oui | Une adresse e-mail ou une URL https lue par un humain (RFC 9116 n'accepte que des contacts web en https). |
+| `contact` | chaîne | oui | Une adresse e-mail ou une URL https lue par un humain. Avant le `@`, seulement des lettres, des chiffres, `.`, `_`, `+` et `-`. Une URL s'écrit en ASCII, espaces et lettres accentuées encodés (`%20`, `%C3%A9`), et en https seulement (RFC 9116). |
 | `responseTime` | texte | oui | Complète « répond sous ___ ». |
 | `emergencyContact` | chaîne | non | À omettre si vous n'en avez pas. |
 | `publicPaths` | chaîne | non | Chemins ou URL que les agents peuvent lire. À omettre si rien n'est public. |
@@ -110,7 +110,7 @@ npx not-a-drill check /NOT_A_DRILL.md    # les fichiers indiqués
 | Code | Sens |
 | --- | --- |
 | `0` | Terminé. |
-| `1` | Refusé (système qui n'est pas réel, fichiers existants sans `--force`, écriture déclinée), ou problèmes trouvés par `check`. |
+| `1` | Refusé (système qui n'est pas réel, fichiers existants sans `--force`, fichiers d'un panneau précédent dans `--out`, écriture déclinée), ou problèmes trouvés par `check`. |
 | `2` | Erreur d'utilisation ou réponses invalides. |
 | `130` | Annulé. |
 

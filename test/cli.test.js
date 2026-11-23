@@ -240,3 +240,44 @@ test("an owner's own translation in another language is not a leftover", () => {
   assert.equal(result.code, 0, result.stderr);
   assert.equal(readFileSync(join(cwd, 'NOT_A_DRILL.de.md'), 'utf8'), 'Meine Übersetzung\n');
 });
+
+test('files of other tools in the snippets folder are not leftovers', () => {
+  const cwd = withAnswers(minimalAnswers());
+  assert.equal(run(['--answers', 'answers.json'], { cwd }).code, 0);
+  writeFileSync(join(cwd, 'not-a-drill-snippets', '.DS_Store'), '');
+  writeFileSync(join(cwd, 'not-a-drill-snippets', 'motd.txt~'), 'old\n');
+  const result = run(['--answers', 'answers.json', '--force'], { cwd });
+  assert.equal(result.code, 0, result.stderr);
+});
+
+test('a leftover translation is found whatever the case of its name', () => {
+  const cwd = withAnswers(minimalAnswers());
+  writeFileSync(join(cwd, 'NOT_A_DRILL.FR.md'), 'ancien panneau\n');
+  const result = run(['--answers', 'answers.json'], { cwd });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /  NOT_A_DRILL\.FR\.md\n/);
+});
+
+test('a linked snippets folder is not listed, and nothing is written through it', () => {
+  const cwd = withAnswers({ ...minimalAnswers(), snippets: false });
+  mkdirSync(join(cwd, 'elsewhere'));
+  writeFileSync(join(cwd, 'elsewhere', 'motd.txt'), 'foreign\n');
+  symlinkSync('elsewhere', join(cwd, 'not-a-drill-snippets'));
+  const off = run(['--answers', 'answers.json'], { cwd });
+  assert.equal(off.code, 0, off.stderr);
+  assert.equal(readFileSync(join(cwd, 'elsewhere', 'motd.txt'), 'utf8'), 'foreign\n');
+  writeFileSync(join(cwd, 'on.json'), JSON.stringify(minimalAnswers()));
+  const on = run(['--answers', 'on.json', '--force'], { cwd });
+  assert.equal(on.code, 1);
+  assert.match(on.stderr, /is a symbolic link/);
+});
+
+test('a snippets folder that cannot be listed stops the run', { skip: process.getuid?.() === 0 && 'root ignores permissions' }, () => {
+  const cwd = withAnswers({ ...minimalAnswers(), snippets: false });
+  mkdirSync(join(cwd, 'not-a-drill-snippets'));
+  chmodSync(join(cwd, 'not-a-drill-snippets'), 0o000);
+  const result = run(['--answers', 'answers.json'], { cwd });
+  assert.equal(result.code, 1);
+  assert.match(result.stderr, /cannot list .*not-a-drill-snippets \(EACCES\)/);
+  assert.ok(!existsSync(join(cwd, 'NOT_A_DRILL.md')));
+});

@@ -5,6 +5,7 @@
 import { accessSync, constants, lstatSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { LANGUAGES, SNIPPETS_DIR } from './constants.js';
+import { SNIPPETS } from './generate.js';
 
 export class WriteError extends Error {
   constructor(message, written = []) {
@@ -103,12 +104,21 @@ function listOrEmpty(dir) {
  * Files an earlier run could have written in `outDir` that this run does not
  * plan: a translation in a language the CLI writes, or a snippet. Left in
  * place, they would contradict the new sign (an old contact, an old date).
- * A sign in another language is the owner's own translation and stays.
+ * Any other file is not ours: a sign in another language is the owner's own
+ * translation, and `.DS_Store` or `motd.txt~` belong to other tools.
  */
 export function findLeftovers(outDir, plannedPaths) {
   const planned = new Set(plannedPaths);
-  const ours = new RegExp(`^NOT_A_DRILL\\.(${LANGUAGES.join('|')})\\.md$`, 'i');
-  const signs = listOrEmpty(outDir).filter((name) => ours.test(name));
-  const snippets = listOrEmpty(join(outDir, SNIPPETS_DIR)).map((name) => `${SNIPPETS_DIR}/${name}`);
+  const signName = new RegExp(`^NOT_A_DRILL\\.(${LANGUAGES.join('|')})\\.md$`, 'i');
+  const snippetNames = new Set(SNIPPETS.map((snippet) => snippet.name.toLowerCase()));
+  const signs = listOrEmpty(outDir).filter((name) => signName.test(name));
+  // A linked snippets directory is not listed: writing into it is refused anyway.
+  const snippetsDir = join(outDir, SNIPPETS_DIR);
+  const linked = lstatOrNull(snippetsDir)?.isSymbolicLink() ?? false;
+  const snippets = linked
+    ? []
+    : listOrEmpty(snippetsDir)
+        .filter((name) => snippetNames.has(name.toLowerCase()))
+        .map((name) => `${SNIPPETS_DIR}/${name}`);
   return [...signs, ...snippets].filter((path) => !planned.has(path)).sort();
 }
