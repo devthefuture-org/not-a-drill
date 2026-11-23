@@ -1,7 +1,8 @@
 name: Release
 
 # A v*.*.* tag publishes to npm through trusted publishing (OIDC): no token,
-# provenance attached. A manual run only checks the package (npm publish --dry-run).
+# provenance attached. A version already on npm is not published again (0.1.0
+# was published by hand). A manual run only checks the package (dry run).
 
 on:
   push:
@@ -48,9 +49,23 @@ jobs:
         run: |
           npm --version
           node -e 'const [a,b,c]=process.argv[1].split(".").map(Number); if (a<11||(a===11&&(b<5||(b===5&&c<1)))) { console.error("npm >= 11.5.1 is required for trusted publishing"); process.exit(1) }' "$(npm --version)"
+      - name: Check whether this version is already on npm
+        id: registry
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          if output="$(npm view "not-a-drill@${version}" version 2>&1)" && [ -n "${output}" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::not-a-drill@${version} is already on npm: nothing to publish"
+          elif [ -z "${output}" ] || echo "${output}" | grep -q E404; then
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${output}" >&2
+            exit 1
+          fi
       - name: Publish (dry run)
         if: github.event_name == 'workflow_dispatch'
-        run: npm publish --dry-run
+        # npm refuses an already published version even in a dry run; --force skips only that check.
+        run: npm publish --dry-run --force
       - name: Publish
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.registry.outputs.published == 'false'
         run: npm publish

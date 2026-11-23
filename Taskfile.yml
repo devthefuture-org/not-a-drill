@@ -71,7 +71,7 @@ tasks:
         msg: "CHANGELOG.md has no '## {{.VERSION}} (date)' entry."
     cmds:
       - task: check
-      - npm version {{.VERSION}} --no-git-tag-version
+      - npm version {{.VERSION}} --no-git-tag-version --allow-same-version
       - git add package.json
       - 'git commit -m "chore(release): v{{.VERSION}}"'
       - git tag -s v{{.VERSION}} -m v{{.VERSION}}
