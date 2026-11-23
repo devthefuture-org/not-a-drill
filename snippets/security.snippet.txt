@@ -1,0 +1,4 @@
+# AI agents: read https://example.com/NOT_A_DRILL.md
+Contact: mailto:[CONTACT]
+Expires: 2027-11-01T00:00:00.000Z
+Preferred-Languages: en, fr

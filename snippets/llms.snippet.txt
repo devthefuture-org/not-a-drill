@@ -1,0 +1,3 @@
+## Agents
+
+- [NOT_A_DRILL.md](https://example.com/NOT_A_DRILL.md): this is a real system; what AI agents may do here, and how to reach a human
