@@ -1,0 +1,78 @@
+version: "3"
+
+# `task` lists the tasks. `task check` is the gate that CI runs.
+
+tasks:
+  default:
+    desc: List the tasks
+    silent: true
+    cmds:
+      - task --list
+
+  test:
+    desc: Run the test suite (includes the template drift test)
+    cmds:
+      - node --test "test/**/*.test.js"
+
+  build:reference:
+    desc: Regenerate template/ and snippets/ from src/templates
+    cmds:
+      - node scripts/build-reference.js
+
+  pack:check:
+    desc: Check the npm package contents, then run it through npx from the tarball
+    cmds:
+      - node scripts/check-pack.js
+
+  docs:install:
+    desc: Install the documentation site dependencies
+    cmds:
+      - npm ci --prefix docs --no-audit --no-fund
+    sources:
+      - docs/package-lock.json
+    generates:
+      - docs/node_modules/.package-lock.json
+
+  docs:dev:
+    desc: Serve the documentation site with live reload
+    deps: [docs:install]
+    cmds:
+      - npm run dev --prefix docs
+
+  docs:build:
+    desc: Build the documentation site (fails on dead links and on a published sign)
+    deps: [docs:install]
+    cmds:
+      - npm run build --prefix docs
+      - node scripts/check-site.js
+
+  docs:preview:
+    desc: Serve the built documentation site
+    cmds:
+      - npm run preview --prefix docs
+
+  check:
+    desc: The gate run by CI - tests, package, documentation
+    cmds:
+      - task: test
+      - task: pack:check
+      - task: docs:build
+
+  release:
+    desc: "Tag a release: task release VERSION=x.y.z (pushing the tag publishes to npm from CI)"
+    requires:
+      vars: [VERSION]
+    preconditions:
+      - sh: test -z "$(git status --porcelain)"
+        msg: The working tree is not clean.
+      - sh: test "$(git branch --show-current)" = main
+        msg: Releases are cut from main.
+      - sh: grep -q "^## {{.VERSION}} " CHANGELOG.md
+        msg: "CHANGELOG.md has no '## {{.VERSION}} (date)' entry."
+    cmds:
+      - task: check
+      - npm version {{.VERSION}} --no-git-tag-version
+      - git add package.json
+      - 'git commit -m "chore(release): v{{.VERSION}}"'
+      - git tag -s v{{.VERSION}} -m v{{.VERSION}}
+      - 'echo "Tagged v{{.VERSION}}. Publish with: git push origin main v{{.VERSION}}"'
